@@ -1,2 +1,5 @@
+bootstrapped
 git+https://github.com/MauriceKarrenbrock/FSDAMGromacs.git #FSDAMGromacs
 numpy
+scipy
+

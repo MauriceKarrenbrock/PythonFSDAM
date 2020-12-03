@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=missing-docstring
 # pylint: disable=redefined-outer-name
+# pylint: disable=no-self-use
 """Tests."""
 from pathlib import Path
 
