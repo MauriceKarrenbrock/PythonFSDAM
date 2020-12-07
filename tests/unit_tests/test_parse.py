@@ -11,7 +11,7 @@
 
 import unittest.mock as mock
 
-import PythonFSDAM.parse as parse
+import PythonFSDAM.parse.parse as parse
 
 
 class TestParseWorkProfile():
@@ -21,7 +21,7 @@ class TestParseWorkProfile():
 
         class_B = mock.MagicMock()
 
-        mocker.patch.object(parse.ParseWorkProfile, 'classes', {
+        mocker.patch.object(parse.ParseWorkProfile, '_classes', {
             'A': class_A,
             'B': class_B
         })
@@ -34,7 +34,7 @@ class TestParseWorkProfile():
 
     def test_implemented(self, mocker):
 
-        mocker.patch.object(parse.ParseWorkProfile, 'classes', {
+        mocker.patch.object(parse.ParseWorkProfile, '_classes', {
             'A': 'a',
             'B': 'b'
         })

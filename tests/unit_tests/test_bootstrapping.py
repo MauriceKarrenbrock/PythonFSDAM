@@ -38,7 +38,7 @@ class Teststandard_deviation():
         assert output == 1.
 
         m_boot.assert_called_once_with(
-            samples=values,
+            values=values,
             stat_func=m_std,
             alpha=alpha,
             num_iterations=num_iterations,

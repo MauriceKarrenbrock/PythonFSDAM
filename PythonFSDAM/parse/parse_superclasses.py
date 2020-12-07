@@ -5,13 +5,14 @@
 # This software is open-source and is distributed under the #
 # BSD 3-Clause "New" or "Revised" License                   #
 #############################################################
-"""Functions to parse output files of MD programs
+"""This are the superclasses of all the parsing classes
+
+This superclasses are both inherited by the factories in .parse
+and in the instances the factories instantiate
 """
 
-import FSDAMGromacs.parse
 
-
-class ParseWorkProfile(object):
+class ParseWorkProfileSuperclass(object):
     """Parse the work profile output file
 
     This is a factory that instantiates the right class to
@@ -25,40 +26,20 @@ class ParseWorkProfile(object):
     -----------
     md_program : str
         the md program that created the file,
-        check cls.implemented() to check the
-        implemented md programs and the
-        relative keywords
-
-    Returns
-    ----------
-    The instance of the right class to parse the
-    file
-
-    Raises
-    ----------
-    KeyError
-        if you give a not valid `md_program`
-        value
+        check `self.md_program` to
+        check which kind of md progam files an instance parses
     """
+    def __init__(self, md_program):
 
-    classes = {'gromacs': FSDAMGromacs.parse.GromacsParseWorkProfile}
-
-    @classmethod
-    def implemented(cls):
-        """returns a list of implemented keywords
-        """
-
-        return cls.classes.keys()
-
-    def __new__(cls, md_program):
-
-        return cls.classes[md_program]()
+        self.md_program = md_program
 
     def parse(self, file_name):
         """all classes should implement this method
 
         it should return a 2-D numpy.array containing [[lambda, ...], [dH/dL, ...]]
         """
+
+        raise NotImplementedError
 
         #parse file_name
 
