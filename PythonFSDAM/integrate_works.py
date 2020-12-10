@@ -10,8 +10,6 @@
 
 import numpy as np
 
-from . import bootstrapping
-
 
 def integrate_work_profiles(lambda_work):
     """Integrates the work profiles with numpy.trapz
@@ -134,24 +132,3 @@ class WorkResults(object):
         """
 
         return self._works
-
-    def get_standard_deviation(self):
-        """Bootstraps the standard deviation
-
-        returns the bootstrapped standard deviation (STD) of the work values
-        run this method only when you have already filled in all the
-        work values otherwise you will get some nonsense result
-        For confidence intervall 2*std (95%) is usually a good value
-
-        check `bootstrapping.standard_deviation` for more info
-
-        Returns
-        ---------
-        float
-        """
-
-        STD = bootstrapping.standard_deviation(self._works)
-
-        STD = STD[0]
-
-        return STD

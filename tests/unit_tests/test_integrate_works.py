@@ -72,16 +72,3 @@ class TestWorkResults():
         instance = wrk.WorkResults(3)
 
         assert instance.get_work_values() is instance._works
-
-    def test_get_standard_deviation(self, mocker):
-
-        m_boot = mocker.patch('PythonFSDAM.bootstrapping.standard_deviation',
-                              return_value=(1., (3, 4)))
-
-        instance = wrk.WorkResults(3)
-
-        output = instance.get_standard_deviation()
-
-        assert output == 1.
-
-        m_boot.assert_called_once()

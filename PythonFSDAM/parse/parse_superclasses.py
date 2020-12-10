@@ -12,7 +12,30 @@ and in the instances the factories instantiate
 """
 
 
-class ParseWorkProfileSuperclass(object):
+class Parser(object):
+    """The generic parser superclass
+
+    Methods
+    --------------
+    parse(file_name)
+        parses the given file
+    """
+    def __init__(self, md_program):
+
+        self.md_program = md_program
+
+    def parse(self, file_name):
+        """parses a file
+
+        all classes should implement this method
+        """
+
+        raise NotImplementedError
+
+        #parse file_name
+
+
+class ParseWorkProfileSuperclass(Parser):
     """Parse the work profile output file
 
     This is a factory that instantiates the right class to
@@ -29,10 +52,6 @@ class ParseWorkProfileSuperclass(object):
         check `self.md_program` to
         check which kind of md progam files an instance parses
     """
-    def __init__(self, md_program):
-
-        self.md_program = md_program
-
     def parse(self, file_name):
         """all classes should implement this method
 
