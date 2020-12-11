@@ -65,7 +65,8 @@ class ParseWorkProfile(super_classes.ParseWorkProfileSuperclass):
 
         return cls._classes.keys()
 
-    def parse(self, file_name):
+    @staticmethod
+    def parse(file_name):
 
         raise NotImplementedError
 
@@ -122,6 +123,7 @@ class ParseCOMCOMDistanceFile(super_classes.Parser):
 
         return cls._classes.keys()
 
-    def parse(self, file_name):
+    @staticmethod
+    def parse(file_name):
 
         raise NotImplementedError

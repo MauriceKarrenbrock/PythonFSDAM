@@ -24,7 +24,8 @@ class Parser(object):
 
         self.md_program = md_program
 
-    def parse(self, file_name):
+    @staticmethod
+    def parse(file_name):
         """parses a file
 
         all classes should implement this method
@@ -52,7 +53,8 @@ class ParseWorkProfileSuperclass(Parser):
         check `self.md_program` to
         check which kind of md progam files an instance parses
     """
-    def parse(self, file_name):
+    @staticmethod
+    def parse(file_name):
         """all classes should implement this method
 
         it should return a 2-D numpy.array containing [[lambda, ...], [dH/dL, ...]]
