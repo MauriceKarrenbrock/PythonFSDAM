@@ -26,6 +26,7 @@ class Pipeline(object):
     Methods
     --------
     execute
+        executes the pipeline
     """
     def execute(self):
         """Executes the pipeline, it is implemented by the subclasses
@@ -53,12 +54,14 @@ class PreProcessingPipeline(Pipeline):
         normally obtained with HREM, if not given
         the `extract_from_trajectory` method must be called
         before `execute`
+    temperature : float
     """
     def __init__(self,
                  topology_files,
                  md_program_path,
                  alchemical_residue,
-                 structure_files=None):
+                 structure_files=None,
+                 temperature=298.15):
 
         self.topology_files = topology_files
 
@@ -67,6 +70,13 @@ class PreProcessingPipeline(Pipeline):
         self.alchemical_residue = alchemical_residue
 
         self.structure_files = structure_files
+
+        self.temperature = temperature
+
+        #For developers: this is should be a string that will be used to correctly
+        #instantiate any kind of classes that are usually instantiated with a factory
+        #it might be something like 'gromacs'
+        self.md_program = None
 
     def extract_from_trajectory(self,
                                 delta_steps,
@@ -168,7 +178,7 @@ class PostProcessingPipeline(Pipeline):
         #For developers: this is should be a string that will be used to correctly
         #instantiate any kind of classes that are usually instantiated with a factory
         #it might be something like 'gromacs'
-        self._md_program = None
+        self.md_program = None
 
         self._free_energy_value = 0
 
@@ -249,7 +259,7 @@ class PostProcessingPipeline(Pipeline):
 
             number_of_unbound_subruns = len(self.unbound_state_dhdl[0])
 
-        dhdl_parser = parse.ParseWorkProfile(self._md_program)
+        dhdl_parser = parse.ParseWorkProfile(self.md_program)
 
         bound_works_calculate = []
         for i in range(number_of_bound_subruns):  # pylint: disable=unused-variable
@@ -414,7 +424,7 @@ class JarzynskiPostProcessingPipeline(PostProcessingPipeline):
 
         distances = []
 
-        parser = parse.ParseCOMCOMDistanceFile(self._md_program)
+        parser = parse.ParseCOMCOMDistanceFile(self.md_program)
 
         for i in files:
 

@@ -20,7 +20,7 @@ def integrate_work_profiles(lambda_work):
     Parameters
     ------------
     lambda_work : numpy.array
-        a 2-D array with 1 st dimention is lambda and the 2nd dH/dL
+        a 2-D array with 1 st line is lambda and the 2nd dH/dL
         [
             [lambda, lambda, lambda],
             [dH/dL, dH/dL, dH/dL]
