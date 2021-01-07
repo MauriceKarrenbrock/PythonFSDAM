@@ -45,13 +45,17 @@ def standard_deviation(values,
         of CPUs will be counted automatically
     Returns
     ------------
-    Bootstrappend_STD, (confidence_intervall_1, confidence_intervall_2) :
-        BootstrapResults representing CI and estimated value.
+    bootstrappend_STD, (confidence_intervall_lower_bound, confidence_intervall_upper_bound) :
+        float, tuple(float,float)
     """
 
-    return bs.bootstrap(values=values,
-                        stat_func=bs_stats.std,
-                        alpha=alpha,
-                        num_iterations=num_iterations,
-                        iteration_batch_size=iteration_batch_size,
-                        num_threads=num_threads)
+    bs_object = bs.bootstrap(values=values,
+                             stat_func=bs_stats.std,
+                             alpha=alpha,
+                             num_iterations=num_iterations,
+                             iteration_batch_size=iteration_batch_size,
+                             num_threads=num_threads)
+    print(type(bs_object))
+    print(bs_object)
+
+    return bs_object.value, (bs_object.lower_bound, bs_object.upper_bound)

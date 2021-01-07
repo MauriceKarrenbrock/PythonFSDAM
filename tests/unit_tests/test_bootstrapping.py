@@ -16,9 +16,19 @@ import PythonFSDAM.bootstrapping as boot
 
 class Teststandard_deviation():
     def test_works(self, mocker):
+        class MockBootResult():
+            def __init__(self):
+
+                self.value = 1.
+
+                self.lower_bound = -1.
+
+                self.upper_bound = 2.
+
+        boot_out = MockBootResult()
 
         m_boot = mocker.patch('bootstrapped.bootstrap.bootstrap',
-                              return_value=1.)
+                              return_value=boot_out)
         m_std = mocker.patch('bootstrapped.stats_functions.std')
 
         values = np.array([1., 2., 3.])
@@ -35,7 +45,7 @@ class Teststandard_deviation():
             iteration_batch_size=iteration_batch_size,
             num_threads=num_threads)
 
-        assert output == 1.
+        assert output == (1., (-1., 2.))
 
         m_boot.assert_called_once_with(
             values=values,
