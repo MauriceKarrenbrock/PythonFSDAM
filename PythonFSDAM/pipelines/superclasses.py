@@ -196,7 +196,7 @@ class PostProcessingPipeline(Pipeline):
 
         raise NotImplementedError
 
-    def _propagate_error(self, error):
+    def _propagate_error(self, error, works=None):
         """propagates the error
 
         according to `calculate_free_energy` or better to what is
@@ -207,6 +207,8 @@ class PostProcessingPipeline(Pipeline):
         -------------
         error : float
             the value of the error before the free energy calculation
+        works : numpy.array, optional, default=None
+            some error propagations might need the work values
 
         Returns
         -----------
@@ -363,7 +365,8 @@ class PostProcessingPipeline(Pipeline):
 
         self._calculate_free_energy_volume_correction()
 
-        confidence_intervall = self._propagate_error(confidence_intervall)
+        confidence_intervall = self._propagate_error(confidence_intervall,
+                                                     combined_work_values)
 
         return self._free_energy_value, confidence_intervall
 
@@ -388,7 +391,7 @@ class JarzynskiPostProcessingPipeline(PostProcessingPipeline):
 
         self._free_energy_value += energy
 
-    def _propagate_error(self, error):
+    def _propagate_error(self, error, works=None):
         """propagates the error for Jarzynski
 
         Parameters
@@ -402,7 +405,12 @@ class JarzynskiPostProcessingPipeline(PostProcessingPipeline):
             the new error
         """
 
-        raise NotImplementedError
+        if not works:
+            raise ValueError(
+                f'works must be a non empty numpy.array, not {works}')
+
+        return free_energy_calculations.jarzynski_error_propagation(
+            error, works, self.temperature)
 
     def _calculate_free_energy_volume_correction(self):
         """Calculates the free energy volume correction

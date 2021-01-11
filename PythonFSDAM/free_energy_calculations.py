@@ -79,7 +79,7 @@ def jarzynski_free_energy(works,
 
     delta_works = works - work_min
 
-    delta_works = delta_works / kappa_T
+    delta_works = -(delta_works / kappa_T)
 
     delta_works = np.exp(delta_works)
 
@@ -140,11 +140,86 @@ def volume_correction(distance_values, temperature=298.15):
     return Delta_G_vol
 
 
-# def jarzynski_error_propagation(bound_error, unbound_error):
-#     """Get the right confidence intervall of jarzynski
+# pylint: disable=anomalous-backslash-in-string
+def jarzynski_error_propagation(error,
+                                works,
+                                temperature=298.15,
+                                boltzmann_kappa=0.001985875):
+    """TODO WORK IN PROGRESS, NOT CORRECT FUNCTION!!!!!!!!!!!
 
-#     starting with the bound and unbound confidence intervall
-#     the function propagates it in order to get the right confidence intervall
-#     """
+    Get the right confidence intervall of jarzynski
 
-#     pass
+    starting from a given error (usually 2*STD)
+    the function propagates it in order to get the right confidence intervall
+
+    Parameters
+    -----------
+    error : float
+        usually 2 * STD
+    works : numpy.array
+        the numpy array of the work values
+    temperature : float, optional
+        the temperature in Kelvin at which the non equilibrium simulation
+        has been done, default 298.15 K
+    boltzmann_kappa : float
+        the Boltzmann constant, the dafault is 0.001985875 kcal/(mol⋅K)
+        and if you keep it the `works` shall be in Kcal
+
+    Returns
+    ----------
+    float
+
+    Notes
+    -----------
+    it propagates the error though this version of the Jarzynski theorem
+    usually used to avoid overflow:
+    math::
+        \Delta G = -kT log (\sum_i e^{-\beta W_i} /N)
+        = -kT log [e^ {-\beta W_{min}}(\sum_i e^{-\beta (W_i - W_{min})}/N]
+        =  W_{min} - kT log(\sum_i e^{-\beta (W_i-W_{min})}/N]
+        = W_{min} + kT (log N - log(\sum_i e^{-\beta (W_i-W_{min})})
+
+    the formula used is:
+    math::
+        \sqrt( \sum_i [(-\beta \frac{e^{-\beta W_i}}{SUM})*error]^2 + [(+\beta \frac{e^{-\beta W_min}}{SUM})*error]^2)
+    math::
+        SUM= \sum_j \frac{1}{e^{-\beta W_j-W_min}}
+    """  # pylint: disable=line-too-long
+
+    kappa_T = temperature * boltzmann_kappa
+
+    work_min = np.min(works)
+
+    min_index = np.argmin(works)
+
+    summation = works - work_min
+
+    summation = summation / kappa_T
+
+    summation = np.exp(summation)
+
+    summation = np.sum(summation)
+
+    summation = 1. / summation
+
+    #--------------------------------
+    #--------------------------------
+
+    output_error = -(works / kappa_T)
+
+    output_error = np.exp(output_error) * (-kappa_T)
+
+    output_error[min_index] = -(output_error[min_index])
+
+    output_error = output_error / summation
+
+    output_error = output_error * error
+
+    output_error = output_error**2
+
+    output_error = np.sum(
+        output_error) * kappa_T + error**2 + 2. * output_error[min_index]
+
+    output_error = output_error**0.5
+
+    return output_error
