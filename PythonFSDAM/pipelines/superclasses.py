@@ -10,6 +10,8 @@
 
 import pathlib
 
+import numpy as np
+import PythonAuxiliaryFunctions.files_IO.write_file as _write
 import PythonPDBStructures.trajectories.extract_frames as extract_frames
 
 import PythonFSDAM.bootstrapping as bootstrapping
@@ -18,6 +20,8 @@ import PythonFSDAM.free_energy_calculations as free_energy_calculations
 import PythonFSDAM.integrate_works as integrate_works
 import PythonFSDAM.parse.parse as parse
 import PythonFSDAM.purge_outliers as purge_outliers
+
+# pylint: disable=too-many-statements
 
 
 class Pipeline(object):
@@ -300,6 +304,11 @@ class PostProcessingPipeline(Pipeline):
         bound_work_values = purge_outliers.purge_outliers_zscore(
             bound_work_values, z_score=3.0)
 
+        # print a backup to file
+        np.savetxt('bound_work_values.dat',
+                   bound_work_values,
+                   header='bound work values after z score purging')
+
         #I am only interested in the vale and not in the confidence intervall
         STD_bound = bootstrapping.standard_deviation(bound_work_values)[0]
 
@@ -345,6 +354,11 @@ class PostProcessingPipeline(Pipeline):
         unbound_work_values = purge_outliers.purge_outliers_zscore(
             unbound_work_values, z_score=3.0)
 
+        # print a backup to file
+        np.savetxt('unbound_work_values.dat',
+                   unbound_work_values,
+                   header='unbound work values after z score purging')
+
         #I am only interested in the vale and not in the confidence intervall
         STD_unbound = bootstrapping.standard_deviation(unbound_work_values)[0]
 
@@ -357,6 +371,11 @@ class PostProcessingPipeline(Pipeline):
         combined_work_values = \
             combine_works.combine_non_correlated_works(bound_work_values, unbound_work_values)
 
+        # print a backup to file
+        np.savetxt('combined_work_values.dat',
+                   combined_work_values,
+                   header='combined_work_values work values')
+
         del bound_work_values
         del unbound_work_values
 
@@ -367,6 +386,13 @@ class PostProcessingPipeline(Pipeline):
 
         confidence_intervall = self._propagate_error(confidence_intervall,
                                                      combined_work_values)
+
+        # print the values of delta G and the confidence intervall (2 sigma)
+        lines = [
+            '# Delta_G  Confidence_intervall(2 sigma)\n',
+            f'{self._free_energy_value:.18e} {confidence_intervall:.18e}'
+        ]
+        _write.write_file(lines, 'free_energy.dat')
 
         return self._free_energy_value, confidence_intervall
 

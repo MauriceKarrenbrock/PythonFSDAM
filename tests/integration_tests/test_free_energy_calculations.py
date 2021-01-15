@@ -24,7 +24,7 @@ class Testjarzynski_free_energy():
                                             boltzmann_kappa=0.001985875)
 
         #previously calculated, only needed to see if nothing changes in the future
-        expected = 0.31004376858517924
+        expected = 1.3100437685851793
 
         assert output == expected
 
