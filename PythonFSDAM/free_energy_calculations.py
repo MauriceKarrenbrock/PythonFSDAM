@@ -12,7 +12,10 @@ import math
 
 import numpy as np
 
-from . import work_probability
+import PythonFSDAM.bootstrapping as boot
+import PythonFSDAM.combine_works as combine
+import PythonFSDAM.exp_max_gaussmix as em
+import PythonFSDAM.work_probability as work_probability
 
 
 # pylint: disable=anomalous-backslash-in-string
@@ -75,7 +78,7 @@ def jarzynski_free_energy(works,
     # 1. / beta
     kappa_T = temperature * boltzmann_kappa
 
-    work_min = np.min(works)
+    work_min = np.amin(works)
 
     delta_works = works - work_min
 
@@ -140,86 +143,170 @@ def volume_correction(distance_values, temperature=298.15):
     return Delta_G_vol
 
 
-# pylint: disable=anomalous-backslash-in-string
-def jarzynski_error_propagation(error,
-                                works,
+def jarzynski_error_propagation(works_1,
+                                works_2,
+                                *,
                                 temperature=298.15,
-                                boltzmann_kappa=0.001985875):
-    """TODO WORK IN PROGRESS, NOT CORRECT FUNCTION!!!!!!!!!!!
+                                boltzmann_kappa=0.001985875,
+                                num_iterations=100):
+    """get STD of the Jarzynki free energy obtained by convolution of bound and unbound work vDSSB
 
-    Get the right confidence intervall of jarzynski
-
-    starting from a given error (usually 2*STD)
-    the function propagates it in order to get the right confidence intervall
+    starting from the bound and unbound work values calculates the STD of the Jarzynski
+    free energy estimate (if you use the vDSSB method)
+    it uses bootstrapping, can be very time and memory consuming
 
     Parameters
     -----------
-    error : float
-        usually 2 * STD
-    works : numpy.array
-        the numpy array of the work values
+    works_1 : numpy.array
+        the first numpy array of the work values
+    works_2 : numpy.array
+        the second numpy array of the work values
     temperature : float, optional
         the temperature in Kelvin at which the non equilibrium simulation
         has been done, default 298.15 K
     boltzmann_kappa : float
         the Boltzmann constant, the dafault is 0.001985875 kcal/(mol⋅K)
         and if you keep it the `works` shall be in Kcal
+    num_iterations : ins, optional, default=100
+        the number of bootstrapping iterations (time and memory consuming)
 
     Returns
     ----------
-    float
+    STD, mean : float, float
+        the STD of the Jarzynski estimate and it's bootstrapped mean value
 
     Notes
     -----------
-    it propagates the error though this version of the Jarzynski theorem
-    usually used to avoid overflow:
-    math::
-        \Delta G = -kT log (\sum_i e^{-\beta W_i} /N)
-        = -kT log [e^ {-\beta W_{min}}(\sum_i e^{-\beta (W_i - W_{min})}/N]
-        =  W_{min} - kT log(\sum_i e^{-\beta (W_i-W_{min})}/N]
-        = W_{min} + kT (log N - log(\sum_i e^{-\beta (W_i-W_{min})})
+    it uses the `jarzynski_free_energy` present in this module, it uses bootstrapping,
+    will take for granted that you mixed the work values with
+    `PythonFSDAM.combine_works.combine_non_correlated_works` and uses the
+    `PythonFSDAM.bootstrapping.mix_and_bootstrap` function to do the bootstrapping
+    """
 
-    the formula used is:
-    math::
-        \sqrt( \sum_i [(-\beta \frac{e^{-\beta W_i}}{SUM})*error]^2 + [(+\beta \frac{e^{-\beta W_min}}{SUM})*error]^2)
-    math::
-        SUM= \sum_j \frac{1}{e^{-\beta W_j-W_min}}
-    """  # pylint: disable=line-too-long
+    # by using this class I can choose the temp and K inside the bootstrapping function
+    class HelperClass(object):
+        """helper class
+        """
+        def __init__(self, temperature, boltzmann_kappa):
 
-    kappa_T = temperature * boltzmann_kappa
+            self.temperature = temperature
+            self.boltzmann_kappa = boltzmann_kappa
 
-    work_min = np.min(works)
+        def calculate_jarzynski(self, values):
+            """helper method
+            """
 
-    min_index = np.argmin(works)
+            return jarzynski_free_energy(values,
+                                         temperature=self.temperature,
+                                         boltzmann_kappa=self.boltzmann_kappa)
 
-    summation = works - work_min
+    helper_obj = HelperClass(temperature=temperature,
+                             boltzmann_kappa=boltzmann_kappa)
 
-    summation = summation / kappa_T
+    out_mean, out_std = boot.mix_and_bootstrap(
+        works_1,
+        works_2,
+        mixing_function=combine.combine_non_correlated_works,
+        stat_function=helper_obj.calculate_jarzynski,
+        num_iterations=num_iterations)
 
-    summation = np.exp(summation)
+    return out_std, out_mean
 
-    summation = np.sum(summation)
 
-    summation = 1. / summation
+def gaussian_mixtures_free_energy(works,
+                                  temperature=298.15,
+                                  boltzmann_kappa=0.001985875,
+                                  n_gaussians=3,
+                                  tol=1.E-6,
+                                  max_iterations=None):
+    """Calculates the free energy with the gaussian mixtures method
 
-    #--------------------------------
-    #--------------------------------
+    starting from the non equilibrium works obtained
+    from for example alchemical transformations
+    you get the free energy difference: Delta F (A, G, ...)
+    if the `works` are in Kcal and you keep the default `boltzmann_kappa`
+    = 0.001985875 kcal/(mol⋅K) the result will be in Kcal/mol
+    otherwise it depends on your choice
 
-    output_error = -(works / kappa_T)
+    uses expectation maximization to fit the data
 
-    output_error = np.exp(output_error) * (-kappa_T)
+    DOES NOT DO A VOLUME CORRECTION NOR AN ERROR ESTIMATE!!!!!!!!
 
-    output_error[min_index] = -(output_error[min_index])
+    Parameters
+    -----------
+    works : numpy.array
+        1-D numpy array containing the values of the
+        non equilibrium works
+        if you don't modify `boltzmann_kappa`
+        they should be Kcal (1 Kcal = 1/4.148 KJ)
+    temperature : float, optional
+        the temperature in Kelvin at which the non equilibrium simulation
+        has been done, default 298.15 K
+    boltzmann_kappa : float
+        the Boltzmann constant, the dafault is 0.001985875 kcal/(mol⋅K)
+        and if you keep it the `works` shall be in Kcal
+    n_gaussians : int
+        the number of gaussians to use for the fit
+    tol : float, optional, default=1.E-6
+        the tollerance for the convergence
+    max_iterations : int, optional, default=`sys.maxsize`
+        maximum number of iterations before raising an Exception
 
-    output_error = output_error / summation
+    Returns
+    ----------
+    free_energy : float
+        the value of the free energy
+        if you used the default `boltzmann_kappa` and the
+        `works` where in Kcal it is in Kcal/mol
 
-    output_error = output_error * error
+    Notes
+    ----------
+    the formula is (for more info check https://dx.doi.org/10.1021/acs.jctc.0c00634
+    and http://dx.doi.org/10.1063/1.4918558)
+    math :
+    \Delta G = k_b T ln( \sum w_i e^( \mu - \beta \sigma^2 / 2))
+    """
 
-    output_error = output_error**2
+    kappa_T = boltzmann_kappa * temperature
 
-    output_error = np.sum(
-        output_error) * kappa_T + error**2 + 2. * output_error[min_index]
+    beta = 1. / kappa_T
 
-    output_error = output_error**0.5
+    def crooks_for_gaussian(mean, var):
+        """helper function
+        """
 
-    return output_error
+        return mean - 0.5 * (var**2) * beta
+
+    em_object = em.EMGauss(works,
+                           n_gaussians=n_gaussians,
+                           tol=tol,
+                           max_iterations=max_iterations)
+
+    gaussians = em_object.fit()
+
+    exponents = np.empty(len(gaussians))
+
+    for i, gaussian in enumerate(gaussians):
+
+        exponents[i] = crooks_for_gaussian(gaussian['mu'], gaussian['sigma'])
+
+    #I do it to avoid over and underflow
+    max_exponent = np.amax(exponents)
+
+    exponents -= max_exponent
+
+    exponents *= (-beta)
+
+    exponents = np.exp(exponents)
+
+    for i, gaussian in enumerate(gaussians):
+
+        exponents[i] *= gaussian['lambda']
+
+    delta_G = np.sum(exponents)
+
+    del exponents
+
+    delta_G = (-kappa_T) * math.log(delta_G) + max_exponent
+
+    return delta_G

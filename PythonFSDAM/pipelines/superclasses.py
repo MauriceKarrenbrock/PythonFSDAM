@@ -14,7 +14,6 @@ import numpy as np
 import PythonAuxiliaryFunctions.files_IO.write_file as _write
 import PythonPDBStructures.trajectories.extract_frames as extract_frames
 
-import PythonFSDAM.bootstrapping as bootstrapping
 import PythonFSDAM.combine_works as combine_works
 import PythonFSDAM.free_energy_calculations as free_energy_calculations
 import PythonFSDAM.integrate_works as integrate_works
@@ -161,13 +160,18 @@ class PostProcessingPipeline(Pipeline):
         it a distance file obtained from the previous enhanced sampling run might be
         needed. If you leave it blank no volume correction will be done (can always do it
         later on your own but you won't probably need it in the unbound state)
+    md_program : str, default=gromacs
+        the md program that created the output to post-process
+        in some cases you can use a superclass directly by setting the right
+        `md_program` in other cases you will need to use some subclass
     """
     def __init__(self,
                  bound_state_dhdl,
                  unbound_state_dhdl,
                  vol_correction_distances_bound_state=None,
                  vol_correction_distances_unbound_state=None,
-                 temperature=298.15):
+                 temperature=298.15,
+                 md_program='gromacs'):
 
         self.bound_state_dhdl = bound_state_dhdl
 
@@ -179,12 +183,13 @@ class PostProcessingPipeline(Pipeline):
 
         self.temperature = temperature
 
-        #For developers: this is should be a string that will be used to correctly
-        #instantiate any kind of classes that are usually instantiated with a factory
-        #it might be something like 'gromacs'
-        self.md_program = None
+        self.md_program = md_program
 
         self._free_energy_value = 0
+
+    def __str__(self):
+
+        return 'not_defined_pipeline'
 
     def _calculate_free_energy(self, works):
         """Calculates the free energy somehow
@@ -200,7 +205,7 @@ class PostProcessingPipeline(Pipeline):
 
         raise NotImplementedError
 
-    def _propagate_error(self, error, works=None):
+    def _propagate_error(self, bound_works, unbound_works):
         """propagates the error
 
         according to `calculate_free_energy` or better to what is
@@ -236,13 +241,54 @@ class PostProcessingPipeline(Pipeline):
 
         raise NotImplementedError
 
+    @staticmethod
+    def _integrate_work_helper_function(dhdl_parser, work_integrator,
+                                        file_list, creation):
+        """PRIVATE
+        """
+
+        #it is needed for some programs like gromacs
+        #that don't print the values of lambda but print the time
+        #and therefore the value of lambda must be calculated
+        #by the parser
+        if creation:
+
+            starting_lambda = 0.
+            ending_lambda = 1.
+
+        else:
+
+            starting_lambda = 1.
+            ending_lambda = 0.
+
+        for file_name in file_list:
+
+            #it is needed for some programs like gromacs
+            #that don't print the values of lambda but print the time
+            #and therefore the value of lambda must be calculated
+            #by the parser
+            try:
+
+                lambda_work_value = dhdl_parser.parse(
+                    file_name,
+                    starting_lambda=starting_lambda,
+                    ending_lambda=ending_lambda)
+
+            except TypeError:
+
+                lambda_work_value = dhdl_parser.parse(file_name)
+
+            work_integrator.integrate_and_add(lambda_work_value)
+
+        return work_integrator
+
     def execute(self):
         """Calculates the free energy
 
         Returns
         -----------
         float, float
-            free energy, 2sigma_cofidence_itervall
+            free energy, STD
         """
 
         bound_multiple_runs = False
@@ -255,7 +301,7 @@ class PostProcessingPipeline(Pipeline):
 
             bound_multiple_runs = True
 
-            number_of_bound_subruns = len(self.bound_state_dhdl[0])
+            number_of_bound_subruns = len(self.bound_state_dhdl)
 
 
         if hasattr(self.unbound_state_dhdl[0], '__iter__') and not \
@@ -263,42 +309,48 @@ class PostProcessingPipeline(Pipeline):
 
             unbound_multiple_runs = True
 
-            number_of_unbound_subruns = len(self.unbound_state_dhdl[0])
+            number_of_unbound_subruns = len(self.unbound_state_dhdl)
 
         dhdl_parser = parse.ParseWorkProfile(self.md_program)
 
         bound_works_calculate = []
         for i in range(number_of_bound_subruns):  # pylint: disable=unused-variable
 
-            bound_works_calculate.append(
-                integrate_works.WorkResults(len(self.bound_state_dhdl)))
+            if bound_multiple_runs:
 
-        #parse and save all the bound run work values
-        for file_name in self.bound_state_dhdl:
+                bound_works_calculate.append(
+                    integrate_works.WorkResults(len(self.bound_state_dhdl[0])))
 
-            for i in range(number_of_bound_subruns):
+            else:
+                bound_works_calculate.append(
+                    integrate_works.WorkResults(len(self.bound_state_dhdl)))
 
-                if bound_multiple_runs:
+        # parse integrate and save the bound work values
+        if bound_multiple_runs:
 
-                    lambda_work_value = dhdl_parser.parse(file_name[i])
+            for i, file_list in enumerate(self.bound_state_dhdl):
 
-                else:
+                bound_works_calculate[
+                    i] = self._integrate_work_helper_function(
+                        dhdl_parser=dhdl_parser,
+                        work_integrator=bound_works_calculate[i],
+                        file_list=file_list,
+                        creation=False)
 
-                    lambda_work_value = dhdl_parser.parse(file_name)
+        else:
 
-                bound_works_calculate[i].integrate_and_add(lambda_work_value)
+            bound_works_calculate[0] = self._integrate_work_helper_function(
+                dhdl_parser=dhdl_parser,
+                work_integrator=bound_works_calculate[0],
+                file_list=self.bound_state_dhdl,
+                creation=False)
 
-        bound_work_values = bound_works_calculate[0].get_work_values()
+        bound_work_values = 0.  #will become a numpy array
+        for i in bound_works_calculate:
 
-        for i in range(1, len(bound_works_calculate)):
-
-            bound_work_values += bound_works_calculate[i].get_work_values()
+            bound_work_values += i.get_work_values()
 
         #free memory, this arrays can be quite big
-        for i in range(len(bound_works_calculate)):
-
-            bound_works_calculate[i] = None
-
         del bound_works_calculate
 
         bound_work_values = purge_outliers.purge_outliers_zscore(
@@ -307,10 +359,7 @@ class PostProcessingPipeline(Pipeline):
         # print a backup to file
         np.savetxt('bound_work_values.dat',
                    bound_work_values,
-                   header='bound work values after z score purging')
-
-        #I am only interested in the vale and not in the confidence intervall
-        STD_bound = bootstrapping.standard_deviation(bound_work_values)[0]
+                   header=('bound work values after z score purging Kcal/mol'))
 
         ############################################################
 
@@ -320,53 +369,55 @@ class PostProcessingPipeline(Pipeline):
         unbound_works_calculate = []
         for i in range(number_of_unbound_subruns):  # pylint: disable=unused-variable
 
-            unbound_works_calculate.append(
-                integrate_works.WorkResults(len(self.unbound_state_dhdl)))
+            if unbound_multiple_runs:
 
-        #parse and save all the unbound run work values
-        for file_name in self.unbound_state_dhdl:
+                unbound_works_calculate.append(
+                    integrate_works.WorkResults(len(
+                        self.unbound_state_dhdl[0])))
 
-            for i in range(number_of_unbound_subruns):
+            else:
+                unbound_works_calculate.append(
+                    integrate_works.WorkResults(len(self.unbound_state_dhdl)))
 
-                if unbound_multiple_runs:
+        # parse integrate and save the bound work values
+        if unbound_multiple_runs:
 
-                    lambda_work_value = dhdl_parser.parse(file_name[i])
+            for i, file_list in enumerate(self.unbound_state_dhdl):
 
-                else:
+                unbound_works_calculate[
+                    i] = self._integrate_work_helper_function(
+                        dhdl_parser=dhdl_parser,
+                        work_integrator=unbound_works_calculate[i],
+                        file_list=file_list,
+                        creation=True)
 
-                    lambda_work_value = dhdl_parser.parse(file_name)
+        else:
 
-                unbound_works_calculate[i].integrate_and_add(lambda_work_value)
+            unbound_works_calculate[0] = self._integrate_work_helper_function(
+                dhdl_parser=dhdl_parser,
+                work_integrator=unbound_works_calculate[0],
+                file_list=self.unbound_state_dhdl,
+                creation=True)
 
-        unbound_work_values = unbound_works_calculate[0].get_work_values()
+        unbound_work_values = 0.  #will become a numpy array
+        for i in unbound_works_calculate:
 
-        for i in range(1, len(unbound_works_calculate)):
-
-            unbound_work_values += unbound_works_calculate[i].get_work_values()
+            unbound_work_values += i.get_work_values()
 
         #free memory, this arrays can be quite big
-        for i in range(len(unbound_works_calculate)):
-
-            unbound_works_calculate[i] = None
-
         del unbound_works_calculate
 
         unbound_work_values = purge_outliers.purge_outliers_zscore(
             unbound_work_values, z_score=3.0)
 
         # print a backup to file
-        np.savetxt('unbound_work_values.dat',
-                   unbound_work_values,
-                   header='unbound work values after z score purging')
-
-        #I am only interested in the vale and not in the confidence intervall
-        STD_unbound = bootstrapping.standard_deviation(unbound_work_values)[0]
+        np.savetxt(
+            'unbound_work_values.dat',
+            unbound_work_values,
+            header=('unbound work values after z score purging Kcal/mol'))
 
         #combine the bound and unbound work values and get a 2sigma (95%) confidence intarvall
-        confidence_intervall = 2. * STD_bound + 2. * STD_unbound
-
-        del STD_bound
-        del STD_unbound
+        STD = self._propagate_error(bound_work_values, unbound_work_values)
 
         combined_work_values = \
             combine_works.combine_non_correlated_works(bound_work_values, unbound_work_values)
@@ -374,7 +425,7 @@ class PostProcessingPipeline(Pipeline):
         # print a backup to file
         np.savetxt('combined_work_values.dat',
                    combined_work_values,
-                   header='combined_work_values work values')
+                   header=('combined_work_values work values Kcal/mol'))
 
         del bound_work_values
         del unbound_work_values
@@ -384,17 +435,15 @@ class PostProcessingPipeline(Pipeline):
 
         self._calculate_free_energy_volume_correction()
 
-        confidence_intervall = self._propagate_error(confidence_intervall,
-                                                     combined_work_values)
-
         # print the values of delta G and the confidence intervall (2 sigma)
         lines = [
-            '# Delta_G  Confidence_intervall(2 sigma)\n',
-            f'{self._free_energy_value:.18e} {confidence_intervall:.18e}'
+            f'# {str(self)}\n',
+            '# Delta_G  STD  confidence_intervall_95%  Kcal/mol\n',
+            f'{self._free_energy_value:.18e} {STD:.18e} {1.96*STD}\n'
         ]
-        _write.write_file(lines, 'free_energy.dat')
+        _write.write_file(lines, f'{str(self)}_free_energy.dat')
 
-        return self._free_energy_value, confidence_intervall
+        return self._free_energy_value, STD
 
 
 class JarzynskiPostProcessingPipeline(PostProcessingPipeline):
@@ -403,6 +452,10 @@ class JarzynskiPostProcessingPipeline(PostProcessingPipeline):
     The distances for this class must be in Angstrom and the energies will always be in
     Kcal/mol
     """
+    def __str__(self):
+
+        return 'jarzynski_pipeline'
+
     def _calculate_free_energy(self, works):
         """Calculates the free energy with Jarzinky
 
@@ -417,7 +470,7 @@ class JarzynskiPostProcessingPipeline(PostProcessingPipeline):
 
         self._free_energy_value += energy
 
-    def _propagate_error(self, error, works=None):
+    def _propagate_error(self, bound_works, unbound_works):
         """propagates the error for Jarzynski
 
         Parameters
@@ -431,12 +484,10 @@ class JarzynskiPostProcessingPipeline(PostProcessingPipeline):
             the new error
         """
 
-        if not works:
-            raise ValueError(
-                f'works must be a non empty numpy.array, not {works}')
+        STD, _ = free_energy_calculations.jarzynski_error_propagation(
+            bound_works, unbound_works, temperature=self.temperature)
 
-        return free_energy_calculations.jarzynski_error_propagation(
-            error, works, self.temperature)
+        return STD
 
     def _calculate_free_energy_volume_correction(self):
         """Calculates the free energy volume correction

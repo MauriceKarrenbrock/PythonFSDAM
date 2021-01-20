@@ -17,7 +17,7 @@ import PythonFSDAM.free_energy_calculations as free
 class Testjarzynski_free_energy():
     def test_calls(self, mocker):
 
-        m_min = mocker.patch('numpy.min', return_value=1.)
+        m_min = mocker.patch('numpy.amin', return_value=1.)
         m_sum = mocker.patch('numpy.sum')
         m_exp = mocker.patch('numpy.exp')
         m_log = mocker.patch('math.log')
@@ -59,3 +59,19 @@ class Testvolume_correction():
         m_std.assert_called_once_with(fake_hist_return[0])
 
         m_log.assert_called_once()
+
+
+class Testjarzynski_error_propagation():
+    def test_works(self, mocker):
+
+        m_boot = mocker.patch('PythonFSDAM.bootstrapping.mix_and_bootstrap',
+                              return_value=(1, 2))
+
+        mocker.patch(
+            'PythonFSDAM.free_energy_calculations.jarzynski_free_energy')
+
+        output = free.jarzynski_error_propagation([1], [2])
+
+        assert output == (2, 1)
+
+        m_boot.assert_called_once()

@@ -10,6 +10,9 @@
 
 import bootstrapped.bootstrap as bs
 import bootstrapped.stats_functions as bs_stats
+import numpy as np
+
+import PythonFSDAM.combine_works as combine_works
 
 
 def standard_deviation(values,
@@ -57,3 +60,75 @@ def standard_deviation(values,
                              num_threads=num_threads)
 
     return bs_object.value, (bs_object.lower_bound, bs_object.upper_bound)
+
+
+def mix_and_bootstrap(
+        values_1,
+        values_2,
+        *,
+        mixing_function=combine_works.combine_non_correlated_works,
+        stat_function=bs_stats.mean,
+        num_iterations=10000):
+    """complex combining and bootstrapping
+
+    it boostraps values from `values_1` and `values_2`, combines them with the
+    given `mixing_fuction` and then calculates the `stat_function` on the obtained
+    values. Returns the mean and the STD of the obtained values
+
+    Parameters
+    --------------
+    values_1 : numpy.array
+        first set of values
+    values_2 : numpy.array
+        second set of values
+    mixing_function : function, default=`PythonFSDAM.combine_works.combine_non_correlated_works`
+        function to use to mix the bootstrapped values_1 with the bootstrapped
+        values_2, must accept 2 numpy.array and return one
+        numpy.array
+    stat_function : function, default=`bootstrapped.stats_functions.mean`
+        the function that will be applied to the mixed values obtained from
+        `mixing_function`, must accept a numpy.array and return a float
+        for more info on the default function check
+        https://github.com/facebookincubator/bootstrapped
+    num_iterations : int, default=10000
+        the number of bootstrapping iterations
+
+    Returns
+    ------------
+    float, float
+        the bootstrapped value of the `stat_function` and the standard deviation STD
+
+    Notes
+    --------
+    this function is 'home made' and not obtimized at all, might be good to optimize in the
+    future
+    """
+
+    if num_iterations < 1:
+        raise ValueError(
+            f'num_iterations can not be less than one, it is {num_iterations}')
+
+    #numpy random number generator
+    rng = np.random.default_rng()
+
+    bootstapped_stat_function = np.empty(num_iterations)
+
+    for i in range(num_iterations):
+
+        bs_values_1 = rng.choice(values_1, values_1.shape, replace=True)
+
+        bs_values_2 = rng.choice(values_2, values_2.shape, replace=True)
+
+        mixed_values = mixing_function(bs_values_1, bs_values_2)
+
+        #try not to keep to much stuff in memory
+        bs_values_1 = None
+        bs_values_2 = None
+
+        bootstapped_stat_function[i] = stat_function(mixed_values)
+
+        #try not to keep to much stuff in memory
+        mixed_values = None
+
+    return np.mean(bootstapped_stat_function), np.std(
+        bootstapped_stat_function)

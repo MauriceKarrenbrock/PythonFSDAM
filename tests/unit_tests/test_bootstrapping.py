@@ -9,7 +9,10 @@
 # BSD 3-Clause "New" or "Revised" License                   #
 #############################################################
 
+from unittest import mock
+
 import numpy as np
+import pytest
 
 import PythonFSDAM.bootstrapping as boot
 
@@ -54,3 +57,61 @@ class Teststandard_deviation():
             num_iterations=num_iterations,
             iteration_batch_size=iteration_batch_size,
             num_threads=num_threads)
+
+
+class Testmix_and_bootstrap():
+    def test_valueerror(self):
+
+        with pytest.raises(ValueError):
+
+            boot.mix_and_bootstrap([1], [2], num_iterations=0)
+
+        with pytest.raises(ValueError):
+
+            boot.mix_and_bootstrap([1], [2], num_iterations=-1)
+
+    def test_keywordonly_arguments(self):
+        def dum(x):
+            return x
+
+        with pytest.raises(TypeError):
+
+            boot.mix_and_bootstrap([1], [2], dum, dum, 10000)  # pylint: disable=too-many-function-args
+
+    def test_works(self, mocker):
+
+        values_1 = np.array([1, 2, 3])
+
+        values_2 = np.array([4, 5, 6])
+
+        m_mixing = mock.MagicMock()
+        m_stat = mock.MagicMock()
+
+        m_random_generator = mock.MagicMock()
+        m_random_generator.choice.side_effect = [[7, 8, 9], [10, 11, 12]]
+
+        m_random_factory = mocker.patch('numpy.random.default_rng',
+                                        return_value=m_random_generator)
+
+        m_mean = mocker.patch('numpy.mean', return_value=1.)
+        m_std = mocker.patch('numpy.std', return_value=2.)
+
+        out_mean, out_std = boot.mix_and_bootstrap(values_1,
+                                                   values_2,
+                                                   mixing_function=m_mixing,
+                                                   stat_function=m_stat,
+                                                   num_iterations=1)
+
+        assert out_mean == 1.
+        assert out_std == 2.
+
+        m_mixing.assert_called_once_with([7, 8, 9], [10, 11, 12])
+
+        m_random_factory.assert_called_once()
+
+        m_random_generator.choice.assert_called()
+
+        m_stat.assert_called_once()
+
+        m_mean.assert_called_once()
+        m_std.assert_called_once()

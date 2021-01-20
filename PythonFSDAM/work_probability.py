@@ -37,7 +37,7 @@ def make_probability_histogram(values, bin_with=0.1):
     """
 
     #get the number of bins
-    number_of_bins = np.max(values)
+    number_of_bins = abs(np.max(values))
     number_of_bins /= bin_with
     number_of_bins = math.ceil(number_of_bins)
 
