@@ -13,7 +13,7 @@ import math
 import numpy as np
 
 
-def make_probability_histogram(values, bin_with=0.1):
+def make_probability_histogram(values, bin_with=0.1, normalize=True):
     """Creates a normalized histogram of the values
 
     It uses numpy.histogram
@@ -27,6 +27,8 @@ def make_probability_histogram(values, bin_with=0.1):
         as the number of bins shall be an integer the
         real bin with migh differ a little bit from the input one
         default = 0.1
+    normalize : bool, optional, defalut=True
+        if true the histogram will be normalized
 
     Returns
     ----------
@@ -41,4 +43,4 @@ def make_probability_histogram(values, bin_with=0.1):
     number_of_bins /= bin_with
     number_of_bins = math.ceil(number_of_bins)
 
-    return np.histogram(values, bins=number_of_bins, density=True)
+    return np.histogram(values, bins=number_of_bins, density=normalize)

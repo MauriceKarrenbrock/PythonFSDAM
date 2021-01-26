@@ -51,19 +51,16 @@ def combine_non_correlated_works(works_1, works_2):
     #empty array N*M long
     output_array = np.empty([works_1.size * works_2.size])
 
+    len_works_2 = len(works_2)
+
     i = 0
     iterator_1 = np.nditer(works_1)
     for value_1 in iterator_1:
 
-        iterator_2 = np.nditer(works_2)
-        for value_2 in iterator_2:
+        cutoff = i * len_works_2
 
-            output_array[i] = value_1 + value_2
+        output_array[cutoff:cutoff + len_works_2] = value_1 + works_2[:]
 
-            i += 1
-
-    #this check might be an overkill but better safe than sorry
-    if i != output_array.size:
-        raise ValueError('Something went wrong in the work combinations')
+        i += 1
 
     return output_array

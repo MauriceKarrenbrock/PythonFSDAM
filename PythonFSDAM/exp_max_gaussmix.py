@@ -8,13 +8,12 @@
 """Use the expectation maximization algorithm for gaussian mixtures
 """
 
+import copy
 import math
 import random
-from collections import Counter
 from sys import maxsize
 
 import numpy as np
-import scipy.stats as stats
 
 
 class EMGauss(object):
@@ -32,14 +31,16 @@ class EMGauss(object):
     tol : float, optional, default=1.E-6
         the tollerance for the convergence
     max_iterations : int, optional, default=`sys.maxsize`
-        maximum number of iterations before raising an Exception
+        maximum number of iterations for each time it tries to fit with a
+        certain number of gaussians
 
     Methods
     ----------
     fit()
         fits the data with the gaussians
-    get_labels()
-        returns the label array
+    set_starting_gaussians(gaussians)
+        you can set some or all the starting gaussians
+        for the fitting
     """
     def __init__(self, values, n_gaussians=3, tol=1.E-6, max_iterations=None):
 
@@ -59,96 +60,210 @@ class EMGauss(object):
         # where 'lambda' is the probability of the gaussian N_gauss / N_tot
         self._gaussians = []
 
-        self._labels = np.zeros(len(values), dtype=np.int8)
+    def set_starting_gaussians(self, gaussians):
+        """give some or all the starting gaussians for the fit
 
-    def get_labels(self):
-        """returns the labels np.array created whith `fit`
+        you can set some of the starting gaussians for the fitting
+        the missing ones will be added automaticly
+
+        Parameters
+        -------------
+        gaussians : list(dicts)
+            see constructor documentation
+
+        Raises
+        ---------
+        ValueError
+            for empty or for too long inputs
         """
 
-        return self._labels
+        if len(gaussians) > self.n_gaussians:
+
+            raise ValueError(
+                'The number of given gaussians is bigger than n_gaussians')
+
+        if not gaussians:
+
+            raise ValueError('gaussians is empty')
+
+        self._gaussians += gaussians
+
+    def _create_starting_gaussians(self, mu, sigma):
+        """private
+        """
+
+        if len(self._gaussians) == self.n_gaussians:
+
+            return self._gaussians
+
+        if not self._gaussians:
+
+            log_lambda = self._append_gaussian(mu, sigma)
+
+        while len(self._gaussians) < self.n_gaussians:
+
+            log_lambda = self._append_gaussian(mu * random.random(),
+                                               sigma * random.random() + 1.E-5)
+
+        return log_lambda
 
     @staticmethod
-    def _probability(value, gaussian):
+    def _probability(values, gaussian):
         """Private
 
         Parameters
         -----------
-        value : float
+        value : numpy.array of float
         gaussian : dict
 
         Returns
         ----------
-        float
+        numpy.array of float
         """
 
-        p = stats.norm(gaussian['mu'], gaussian['sigma']).pdf(value)
+        norm = 1. / (gaussian['sigma'] * (2 * math.pi)**0.5)
 
-        p *= gaussian['lambda']
+        _values = values - gaussian['mu']
 
-        return p
+        _values = _values**2
 
-    def _expectation(self):
+        _values = -_values / (2. * gaussian['sigma']**2)
+
+        _values = np.exp(_values)
+
+        _values *= norm * gaussian['lambda']
+
+        return _values
+
+    def _get_weights_matrix(self):
         """private
         """
 
-        probabilities = np.empty(len(self._gaussians))
+        weights_matrix = np.empty([len(self._gaussians), len(self.values)])
 
-        for i, value in enumerate(self.values):
+        for i, gaussian in enumerate(self._gaussians):
 
-            for j, gaussian in enumerate(self._gaussians):
+            probability = self._probability(self.values, gaussian)
 
-                probabilities[j] = self._probability(value, gaussian)
+            weights_matrix[i, :] = probability[:]
 
-            self._labels[i] = np.argmax(probabilities)
+        return weights_matrix
 
-    def _maximization(self):
+    @staticmethod
+    def _normalize_weights_matrix(weights_matrix):
         """private
         """
 
-        number_of_values_per_gaussian = Counter(self._labels)
+        normalization_value = np.sum(weights_matrix, axis=0)
 
-        tot_number_of_values = len(self.values)
-        for key, number_of_values in number_of_values_per_gaussian.items():
+        normalization_value = np.where(normalization_value > 0.,
+                                       normalization_value, 1.E-10)
 
-            #get new probability (lambda for the gaussian)
-            self._gaussians[key]['lambda'] = float(
-                number_of_values) / tot_number_of_values
+        #normalize weights_matrix
+        for i in range(weights_matrix.shape[0]):
 
-            #get new mean and sigma for the gaussian
-            #might be a very slow implementation
-            # TODO find something better
-            tmp_array = np.empty(number_of_values)
+            weights_matrix[i, :] /= normalization_value[:]
 
-            j = 0
-            iterator = np.nditer(self._labels)
-            for label in iterator:
+        return weights_matrix
 
-                if label == key:
-
-                    tmp_array[j] = self.values[iterator.index]
-
-                    j += 1
-
-            self._gaussians[key]['mu'] = np.mean(tmp_array)
-            self._gaussians[key]['sigma'] = np.std(tmp_array)
-
-    def _determine_convergence(self, log_new_lambdas, log_old_lambdas):
+    def _expectation_maximization(self, weights_matrix=None):
         """private
         """
 
-        dist = 0
+        #-----------------------------------------------------
+        #expectation
+        #-----------------------------------------------------
 
-        for i, j in zip(log_new_lambdas, log_old_lambdas):
+        #only need to do it at the first iteration
+        if weights_matrix is None:
 
-            dist += (i - j)**2
+            weights_matrix = self._get_weights_matrix()
 
-        dist = dist**0.5
+        weights_matrix = self._normalize_weights_matrix(weights_matrix)
 
-        if dist < self.tol:
+        number_of_values = len(self.values)
+
+        # a vector with each element equal to np.sum(weights_matrix[i, :])
+        n_per_gaussian = np.sum(weights_matrix, axis=1)
+
+        #to avoid division by zero
+        n_per_gaussian = np.where(n_per_gaussian > 0., n_per_gaussian, 1.E-10)
+
+        for i in range(len(self._gaussians)):
+
+            self._gaussians[i]['lambda'] = n_per_gaussian[i] / number_of_values
+
+        #-----------------------------------------------------
+        #maximization
+        #-----------------------------------------------------
+
+        for i in range(len(self._gaussians)):
+
+            tmp_vector = weights_matrix[i, :] * self.values[:]
+
+            self._gaussians[i]['mu'] = np.sum(tmp_vector) / n_per_gaussian[i]
+
+            del tmp_vector
+
+            tmp_sigma = weights_matrix[i, :] * (self.values[:] -
+                                                self._gaussians[i]['mu'])**2
+
+            tmp_sigma = np.sum(tmp_sigma)
+
+            self._gaussians[i]['sigma'] = (tmp_sigma / n_per_gaussian[i])**0.5
+
+            del tmp_sigma
+
+            # to avoid sigma = 0
+            if self._gaussians[i]['sigma'] < 1.E-5:
+
+                self._gaussians[i]['sigma'] = 1.E-5
+
+        #calculate log likelyhood
+
+        #update weights_matrix with new gaussians (not normalized)
+        weights_matrix = self._get_weights_matrix()
+
+        log_lambda = np.sum(weights_matrix, axis=1)
+
+        #be sure not to have zeros (for log)
+        log_lambda = np.where(log_lambda > 0., log_lambda, 1.E-10)
+
+        log_lambda = np.log(log_lambda)
+
+        log_lambda = np.sum(log_lambda)
+
+        return log_lambda, weights_matrix
+
+    def _determine_convergence(self, new_log_lambda, old_log_lambda):
+        """private
+        """
+
+        dlog = abs(old_log_lambda - new_log_lambda)
+
+        if dlog < self.tol:
 
             return True
 
         return False
+
+    def _append_gaussian(self, mu, sigma):
+        """private
+        """
+
+        number_of_gaussians = len(self._gaussians) + 1
+
+        self._gaussians.append({'mu': mu, 'sigma': sigma})
+
+        for i in range(len(self._gaussians)):
+
+            #be sure to have normalized coefficients
+            self._gaussians[i]['lambda'] = 1.0 / number_of_gaussians
+
+            #re-create a old_log_lambda
+            old_log_lambda = float(maxsize)
+
+        return old_log_lambda
 
     def fit(self):
         """The main method, fits your dataset with gaussians
@@ -161,10 +276,12 @@ class EMGauss(object):
             'mu' = the mean (float)
             'sigma' = the sigma (std) of the gaussian (float)
             'lambda = the normalized coefficient of the gaussian (float)
+        log_likelyhood : float
+            the logarithm of the total likelihood
 
         Raises
         -----------
-        Exception
+        RuntimeError
             if a convergence is not achieved in `max_iterations` iterations
         """
 
@@ -172,20 +289,10 @@ class EMGauss(object):
 
         sigma = np.std(self.values)
 
-        log_old_lambdas = []
-        #create first guess for gaussians
-        for i in range(self.n_gaussians):  # pylint: disable=unused-variable
+        # start with one gaussian
+        old_log_lambda = self._create_starting_gaussians(mu, sigma)
 
-            self._gaussians.append({
-                'mu': mu * random.random(),
-                'sigma': sigma * random.random(),
-                'lambda': 1. / self.n_gaussians,
-            })
-
-            log_old_lambdas.append(float(maxsize))
-
-        del mu
-        del sigma
+        weights_matrix = None
 
         iteration = 0
         has_converged = False
@@ -193,22 +300,18 @@ class EMGauss(object):
 
             if iteration == self.max_iterations - 1:
 
-                raise Exception(
-                    f'EM fit did not converge in {self.max_iterations} steps with tol {self.tol}'
+                raise RuntimeError(
+                    f'Could not converge EM gaussian mixing with {self.n_gaussians} gaussians'
                 )
 
-            self._expectation()
-
-            self._maximization()
-
-            log_new_lambdas = []
-            for gaussian in self._gaussians:
-
-                log_new_lambdas.append(math.log(gaussian['lambda']))
+            new_log_lambda, weights_matrix = self._expectation_maximization(
+                weights_matrix)
 
             has_converged = self._determine_convergence(
-                log_new_lambdas, log_old_lambdas)
+                new_log_lambda, old_log_lambda)
 
-            log_old_lambdas = log_new_lambdas
+            old_log_lambda = copy.deepcopy(new_log_lambda)
 
-        return self._gaussians
+            iteration += 1
+
+        return self._gaussians, new_log_lambda

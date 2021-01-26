@@ -228,18 +228,39 @@ class PostProcessingPipeline(Pipeline):
         raise NotImplementedError
 
     def _calculate_free_energy_volume_correction(self):
-        """Calculates the free energy volume correction
+        """Calculates the free energy volume correction for a position restraint
 
-        it is a hook for subclasses and it must
-        update `self._free_energy_value`
+        it takes for granted you have a COM COM restraint
+        and uses the COM COM distance to make a correction
 
         Parameters
         ------------
         distance_file : pathlib.Path
             the file containing the distance values
+            they must be in Angstrom and will return in Kcal/mol
         """
 
-        raise NotImplementedError
+        files = [
+            self.vol_correction_distances_bound_state,
+            self.vol_correction_distances_unbound_state
+        ]
+
+        distances = []
+
+        parser = parse.ParseCOMCOMDistanceFile(self.md_program)
+
+        for i in files:
+
+            if i is not None:
+
+                distances.append(parser.parse(i))
+
+        for dist in distances:
+
+            energy = free_energy_calculations.volume_correction(
+                dist, self.temperature)
+
+            self._free_energy_value += energy
 
     @staticmethod
     def _integrate_work_helper_function(dhdl_parser, work_integrator,
@@ -416,9 +437,6 @@ class PostProcessingPipeline(Pipeline):
             unbound_work_values,
             header=('unbound work values after z score purging Kcal/mol'))
 
-        #combine the bound and unbound work values and get a 2sigma (95%) confidence intarvall
-        STD = self._propagate_error(bound_work_values, unbound_work_values)
-
         combined_work_values = \
             combine_works.combine_non_correlated_works(bound_work_values, unbound_work_values)
 
@@ -426,6 +444,9 @@ class PostProcessingPipeline(Pipeline):
         np.savetxt('combined_work_values.dat',
                    combined_work_values,
                    header=('combined_work_values work values Kcal/mol'))
+
+        #combine the bound and unbound work values and get a 2sigma (95%) confidence intarvall
+        STD = self._propagate_error(bound_work_values, unbound_work_values)
 
         del bound_work_values
         del unbound_work_values
@@ -438,8 +459,8 @@ class PostProcessingPipeline(Pipeline):
         # print the values of delta G and the confidence intervall (2 sigma)
         lines = [
             f'# {str(self)}\n',
-            '# Delta_G  STD  confidence_intervall_95%  Kcal/mol\n',
-            f'{self._free_energy_value:.18e} {STD:.18e} {1.96*STD}\n'
+            '# Delta_G  STD  confidence_intervall_95%(1.96STD)  unit=Kcal/mol\n',
+            f'{self._free_energy_value:.18e} {STD:.18e} {1.96*STD:.18e}\n'
         ]
         _write.write_file(lines, f'{str(self)}_free_energy.dat')
 
@@ -489,37 +510,70 @@ class JarzynskiPostProcessingPipeline(PostProcessingPipeline):
 
         return STD
 
-    def _calculate_free_energy_volume_correction(self):
-        """Calculates the free energy volume correction
 
-        it takes for granted you have a COM COM restraint
-        and uses the COM COM distance to make a correction
+class GaussianMixturesPostProcessingPipeline(PostProcessingPipeline):
+    """subclass of `PostProcessingPipeline` that calculates free energy with  gaussian mixtures
+
+    The distances for this class must be in Angstrom and the energies will always be in
+    Kcal/mol
+
+    Notes
+    ----------
+    for more info check https://dx.doi.org/10.1021/acs.jctc.0c00634
+    and http://dx.doi.org/10.1063/1.4918558
+    """
+    def __str__(self):
+
+        return 'gaussian_mixtures_pipeline'
+
+    def _write_gaussians(self, gaussians, log_likelyhood):
+        """private"""
+
+        lines = []
+
+        lines.append(
+            f'#each line is a gaussian, log likelyhood = {log_likelyhood}\n')
+        lines.append('mean,sigma,coefficient\n')
+
+        for gaussian in gaussians:
+
+            lines.append(
+                f'{gaussian["mu"]:.18e},{gaussian["sigma"]:.18e},{gaussian["lambda"]:.18e}\n'
+            )
+
+        _write.write_file(lines, f'{str(self)}_gaussians.csv')
+
+    def _calculate_free_energy(self, works):
+        """Calculates the free energy with Jarzinky
 
         Parameters
-        ------------
-        distance_file : pathlib.Path
-            the file containing the distance values
-            they must be in Angstrom and will return in Kcal/mol
+        -------------
+        works : numpy.array
+            the work values
         """
 
-        files = [
-            self.vol_correction_distances_bound_state,
-            self.vol_correction_distances_unbound_state
-        ]
+        energy, gaussians, log_likelyhood = free_energy_calculations.gaussian_mixtures_free_energy(
+            works, self.temperature)
 
-        distances = []
+        self._write_gaussians(gaussians, log_likelyhood)
 
-        parser = parse.ParseCOMCOMDistanceFile(self.md_program)
+        self._free_energy_value += energy
 
-        for i in files:
+    def _propagate_error(self, bound_works, unbound_works):
+        """propagates the error for Jarzynski
 
-            if i is not None:
+        Parameters
+        -------------
+        error : float
+            the value of the error before the free energy calculation
 
-                distances.append(parser.parse(i))
+        Returns
+        -----------
+        float
+            the new error
+        """
 
-        for dist in distances:
+        STD, _ = free_energy_calculations.gaussian_mixtures_error_propagation(
+            bound_works, unbound_works, temperature=self.temperature)
 
-            energy = free_energy_calculations.volume_correction(
-                dist, self.temperature)
-
-            self._free_energy_value += energy
+        return STD
