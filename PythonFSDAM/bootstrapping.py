@@ -8,6 +8,8 @@
 """Contains functions that use bootstrapping methods
 """
 
+from multiprocessing import Pool
+
 import bootstrapped.bootstrap as bs
 import bootstrapped.stats_functions as bs_stats
 import numpy as np
@@ -62,18 +64,44 @@ def standard_deviation(values,
     return bs_object.value, (bs_object.lower_bound, bs_object.upper_bound)
 
 
+def _mix_and_bootstrap_helper_function(values_1, values_2, mixing_function,
+                                       stat_function):
+    """private
+
+    helper function
+    """
+
+    #numpy random number generator
+    rng = np.random.default_rng()
+
+    bs_values_1 = rng.choice(values_1, values_1.shape, replace=True)
+
+    bs_values_2 = rng.choice(values_2, values_2.shape, replace=True)
+
+    mixed_values = mixing_function(bs_values_1, bs_values_2)
+
+    #try not to keep to much stuff in memory
+    bs_values_1 = None
+    bs_values_2 = None
+
+    return stat_function(mixed_values)
+
+
 def mix_and_bootstrap(
         values_1,
         values_2,
         *,
         mixing_function=combine_works.combine_non_correlated_works,
         stat_function=bs_stats.mean,
-        num_iterations=10000):
+        num_iterations=10000,
+        n_threads=None):
     """complex combining and bootstrapping
 
     it boostraps values from `values_1` and `values_2`, combines them with the
     given `mixing_fuction` and then calculates the `stat_function` on the obtained
     values. Returns the mean and the STD of the obtained values
+
+    it uses multiprocessing to parallelize the task
 
     Parameters
     --------------
@@ -92,6 +120,10 @@ def mix_and_bootstrap(
         https://github.com/facebookincubator/bootstrapped
     num_iterations : int, default=10000
         the number of bootstrapping iterations
+    n_threads : int, optional, default None
+        the number of parallel threads to use
+        if left None they will be detected automatically
+        by multiprocessing.Pool
 
     Returns
     ------------
@@ -100,35 +132,29 @@ def mix_and_bootstrap(
 
     Notes
     --------
-    this function is 'home made' and not obtimized at all, might be good to optimize in the
-    future
+    this function is can be memory intensive if heavilly parallelized
     """
 
     if num_iterations < 1:
         raise ValueError(
             f'num_iterations can not be less than one, it is {num_iterations}')
 
-    #numpy random number generator
-    rng = np.random.default_rng()
+    #make input for parallel section
+    input_values = []
+    for i in range(num_iterations):  # pylint: disable=unused-variable
 
-    bootstapped_stat_function = np.empty(num_iterations)
+        input_values.append(
+            (values_1, values_2, mixing_function, stat_function))
 
-    for i in range(num_iterations):
+    #make bootstrap and mix in parallel
+    with Pool(n_threads) as pool:
 
-        bs_values_1 = rng.choice(values_1, values_1.shape, replace=True)
+        bootstapped_stat_function = pool.starmap_async(
+            _mix_and_bootstrap_helper_function, input_values)
 
-        bs_values_2 = rng.choice(values_2, values_2.shape, replace=True)
+        bootstapped_stat_function = bootstapped_stat_function.get()
 
-        mixed_values = mixing_function(bs_values_1, bs_values_2)
-
-        #try not to keep to much stuff in memory
-        bs_values_1 = None
-        bs_values_2 = None
-
-        bootstapped_stat_function[i] = stat_function(mixed_values)
-
-        #try not to keep to much stuff in memory
-        mixed_values = None
+    bootstapped_stat_function = np.array(bootstapped_stat_function)
 
     return np.mean(bootstapped_stat_function), np.std(
         bootstapped_stat_function)

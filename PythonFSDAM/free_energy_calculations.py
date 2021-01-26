@@ -143,6 +143,25 @@ def volume_correction(distance_values, temperature=298.15):
     return Delta_G_vol
 
 
+# by using this class I can choose the temp and K inside the bootstrapping function
+# had to put it outside the function to allow the use of multiprocessing
+class _JarzynskiHelperClass(object):
+    """helper class
+    """
+    def __init__(self, temperature, boltzmann_kappa):
+
+        self.temperature = temperature
+        self.boltzmann_kappa = boltzmann_kappa
+
+    def calculate_jarzynski(self, values):
+        """helper method
+        """
+
+        return jarzynski_free_energy(values,
+                                     temperature=self.temperature,
+                                     boltzmann_kappa=self.boltzmann_kappa)
+
+
 def jarzynski_error_propagation(works_1,
                                 works_2,
                                 *,
@@ -183,25 +202,8 @@ def jarzynski_error_propagation(works_1,
     `PythonFSDAM.bootstrapping.mix_and_bootstrap` function to do the bootstrapping
     """
 
-    # by using this class I can choose the temp and K inside the bootstrapping function
-    class HelperClass(object):
-        """helper class
-        """
-        def __init__(self, temperature, boltzmann_kappa):
-
-            self.temperature = temperature
-            self.boltzmann_kappa = boltzmann_kappa
-
-        def calculate_jarzynski(self, values):
-            """helper method
-            """
-
-            return jarzynski_free_energy(values,
-                                         temperature=self.temperature,
-                                         boltzmann_kappa=self.boltzmann_kappa)
-
-    helper_obj = HelperClass(temperature=temperature,
-                             boltzmann_kappa=boltzmann_kappa)
+    helper_obj = _JarzynskiHelperClass(temperature=temperature,
+                                       boltzmann_kappa=boltzmann_kappa)
 
     out_mean, out_std = boot.mix_and_bootstrap(
         works_1,
@@ -369,6 +371,35 @@ def gaussian_mixtures_free_energy(works,
         'log_likelyhood']
 
 
+# by using this class I can choose the temp and K inside the bootstrapping function
+# had to put it outside the function to allow the use of multiprocessing
+class _GaussianMixturesHelperClass(object):
+    """helper class
+    """
+    def __init__(self, temperature, boltzmann_kappa, n_gaussians, tol,
+                 max_iterations):
+
+        self.temperature = temperature
+        self.boltzmann_kappa = boltzmann_kappa
+        self.n_gaussians = n_gaussians
+        self.tol = tol
+        self.max_iterations = max_iterations
+
+    def calculate_gaussian_mixtures(self, values):
+        """helper method
+        """
+
+        energy, _, _ = gaussian_mixtures_free_energy(
+            values,
+            temperature=self.temperature,
+            boltzmann_kappa=self.boltzmann_kappa,
+            n_gaussians=self.n_gaussians,
+            tol=self.tol,
+            max_iterations=self.max_iterations)
+
+        return energy
+
+
 def gaussian_mixtures_error_propagation(works_1,
                                         works_2,
                                         *,
@@ -419,38 +450,11 @@ def gaussian_mixtures_error_propagation(works_1,
     `PythonFSDAM.bootstrapping.mix_and_bootstrap` function to do the bootstrapping
     """
 
-    # by using this class I can choose the temp and K inside the bootstrapping function
-    class HelperClass(object):
-        """helper class
-        """
-        def __init__(self, temperature, boltzmann_kappa, n_gaussians, tol,
-                     max_iterations):
-
-            self.temperature = temperature
-            self.boltzmann_kappa = boltzmann_kappa
-            self.n_gaussians = n_gaussians
-            self.tol = tol
-            self.max_iterations = max_iterations
-
-        def calculate_gaussian_mixtures(self, values):
-            """helper method
-            """
-
-            energy, _, _ = gaussian_mixtures_free_energy(
-                values,
-                temperature=self.temperature,
-                boltzmann_kappa=self.boltzmann_kappa,
-                n_gaussians=self.n_gaussians,
-                tol=self.tol,
-                max_iterations=self.max_iterations)
-
-            return energy
-
-    helper_obj = HelperClass(temperature=temperature,
-                             boltzmann_kappa=boltzmann_kappa,
-                             n_gaussians=n_gaussians,
-                             tol=tol,
-                             max_iterations=max_iterations)
+    helper_obj = _GaussianMixturesHelperClass(temperature=temperature,
+                                              boltzmann_kappa=boltzmann_kappa,
+                                              n_gaussians=n_gaussians,
+                                              tol=tol,
+                                              max_iterations=max_iterations)
 
     out_mean, out_std = boot.mix_and_bootstrap(
         works_1,
