@@ -2,6 +2,7 @@
 # pylint: disable=missing-docstring
 # pylint: disable=redefined-outer-name
 # pylint: disable=no-self-use
+# pylint: disable=protected-access
 #############################################################
 # Copyright (c) 2020-2020 Maurice Karrenbrock               #
 #                                                           #
@@ -87,12 +88,17 @@ class Testmix_and_bootstrap():
         m_mixing = mock.MagicMock()
         m_stat = mock.MagicMock()
 
-        m_random_generator = mock.MagicMock()
-        m_random_generator.choice.side_effect = [[7, 8, 9], [10, 11, 12]]
+        m_pool = mocker.patch('multiprocessing.pool.Pool')
 
-        m_random_factory = mocker.patch('numpy.random.default_rng',
-                                        return_value=m_random_generator)
+        m_pool_enter = mock.MagicMock()
 
+        m_pool_enter.return_value.starmap_async.return_value.get.return_value = [
+            1., 2., 3.
+        ]
+
+        m_pool.return_value.__enter__.return_value = m_pool_enter
+
+        m_array = mocker.patch('numpy.array', return_value=1.)
         m_mean = mocker.patch('numpy.mean', return_value=1.)
         m_std = mocker.patch('numpy.std', return_value=2.)
 
@@ -105,13 +111,41 @@ class Testmix_and_bootstrap():
         assert out_mean == 1.
         assert out_std == 2.
 
+        m_stat.assert_not_called()
+
+        m_array.assert_called_once()
+
+        m_mean.assert_called_once()
+        m_std.assert_called_once()
+
+
+class Test_mix_and_bootstrap_helper_function():
+    def test_works(self, mocker):
+
+        m_mixing = mock.MagicMock()
+        m_mixing.return_value = [2, 3, 7, 8]
+
+        m_stat = mock.MagicMock()
+        m_stat.return_value = 1.
+
+        m_random_generator = mock.MagicMock()
+        m_random_generator.choice.side_effect = [[7, 8, 9], [10, 11, 12]]
+
+        m_random_factory = mocker.patch('numpy.random.default_rng',
+                                        return_value=m_random_generator)
+
+        output = boot._mix_and_bootstrap_helper_function(
+            np.array([1, 2]),
+            np.array([3, 4]),
+            mixing_function=m_mixing,
+            stat_function=m_stat)
+
         m_mixing.assert_called_once_with([7, 8, 9], [10, 11, 12])
+
+        m_stat.assert_called_once_with([2, 3, 7, 8])
 
         m_random_factory.assert_called_once()
 
         m_random_generator.choice.assert_called()
 
-        m_stat.assert_called_once()
-
-        m_mean.assert_called_once()
-        m_std.assert_called_once()
+        assert output == 1.

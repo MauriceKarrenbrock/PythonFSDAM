@@ -15,16 +15,42 @@ import PythonFSDAM.bootstrapping as boot
 import PythonFSDAM.combine_works as combine
 import PythonFSDAM.free_energy_calculations as free
 
+#------------------------------------------------------------
+#some helper functions that I need to define in the global
+#scope because I am using multiprocessing
+#------------------------------------------------------------
+
+
+def simple_mix(x, y):
+
+    return x + y
+
+
+def dummy_calculation(x):
+
+    return np.mean(x)
+
+
+class Helper():
+    def __init__(self, temperature, boltzmann_kappa):
+
+        self.temperature = temperature
+        self.boltzmann_kappa = boltzmann_kappa
+
+    def calculate_jarzynski(self, values):
+
+        return free.jarzynski_free_energy(values,
+                                          temperature=self.temperature,
+                                          boltzmann_kappa=self.boltzmann_kappa)
+
+
+#------------------------------------------------------------
+#END
+#------------------------------------------------------------
+
 
 class Testmix_and_bootstrap():
     def test_with_simple_function(self):
-        def simple_mix(x, y):
-
-            return x + y
-
-        def dummy_calculation(x):
-
-            return np.mean(x)
 
         values_1 = np.array([1, 2, 3])
         values_2 = np.array([4, 5, 6])
@@ -69,18 +95,6 @@ class Testmix_and_bootstrap():
         #assert np.testing.assert_allclose(out_std, expected_std, rtol=0.03) is None
 
     def test_with_helper_class(self):
-        class Helper():
-            def __init__(self, temperature, boltzmann_kappa):
-
-                self.temperature = temperature
-                self.boltzmann_kappa = boltzmann_kappa
-
-            def calculate_jarzynski(self, values):
-
-                return free.jarzynski_free_energy(
-                    values,
-                    temperature=self.temperature,
-                    boltzmann_kappa=self.boltzmann_kappa)
 
         helper_obj = Helper(temperature=100., boltzmann_kappa=0.1)
 
