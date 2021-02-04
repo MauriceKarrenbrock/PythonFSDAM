@@ -96,6 +96,45 @@ def jarzynski_free_energy(works,
     return free_energy
 
 
+def weighted_jarzynski_free_energy(works,
+                                   weights,
+                                   temperature=298.15,
+                                   boltzmann_kappa=0.001985875):
+    """Jarzynki free energy of weighted works
+
+    if for some reason you have a weight you want to
+    give to your works, like when you use results produced
+    by diferent MD programs this function lets you do a
+    wheighted Jarzynski exponential average
+
+    this function uses the `jarzynski_free_energy` function
+    if you change the implementation of that function you need to
+    change this function too!!!!
+
+    Parameters
+    --------------
+    weights : numpy.array
+        the weights you want to give to the work values
+        they must be in the same order of the works
+        and in the same number
+    for all other parameters check `jarzynski_free_energy`
+    """
+
+    weighted_works = works * weights
+
+    free_energy = jarzynski_free_energy(works=weighted_works,
+                                        temperature=temperature,
+                                        boltzmann_kappa=boltzmann_kappa)
+
+    log_total_weight = math.log(np.sum(weights))
+
+    log_N = math.log(works.size)
+
+    free_energy += temperature * boltzmann_kappa * (log_total_weight - log_N)
+
+    return free_energy
+
+
 def volume_correction(distance_values, temperature=298.15):
     """Calculates the volume correction of the free energy
 
@@ -145,7 +184,7 @@ def volume_correction(distance_values, temperature=298.15):
 
 # by using this class I can choose the temp and K inside the bootstrapping function
 # had to put it outside the function to allow the use of multiprocessing
-class _JarzynskiHelperClass(object):
+class _vDSSBJarzynskiErrorPropagationHelperClass(object):
     """helper class
     """
     def __init__(self, temperature, boltzmann_kappa):
@@ -162,12 +201,12 @@ class _JarzynskiHelperClass(object):
                                      boltzmann_kappa=self.boltzmann_kappa)
 
 
-def jarzynski_error_propagation(works_1,
-                                works_2,
-                                *,
-                                temperature=298.15,
-                                boltzmann_kappa=0.001985875,
-                                num_iterations=10000):
+def vDSSB_jarzynski_error_propagation(works_1,
+                                      works_2,
+                                      *,
+                                      temperature=298.15,
+                                      boltzmann_kappa=0.001985875,
+                                      num_iterations=10000):
     """get STD of the Jarzynki free energy obtained by convolution of bound and unbound work vDSSB
 
     starting from the bound and unbound work values calculates the STD of the Jarzynski
@@ -186,7 +225,7 @@ def jarzynski_error_propagation(works_1,
     boltzmann_kappa : float
         the Boltzmann constant, the dafault is 0.001985875 kcal/(mol⋅K)
         and if you keep it the `works` shall be in Kcal
-    num_iterations : ins, optional, default=100
+    num_iterations : ins, optional, default=10000
         the number of bootstrapping iterations (time and memory consuming)
 
     Returns
@@ -202,14 +241,49 @@ def jarzynski_error_propagation(works_1,
     `PythonFSDAM.bootstrapping.mix_and_bootstrap` function to do the bootstrapping
     """
 
-    helper_obj = _JarzynskiHelperClass(temperature=temperature,
-                                       boltzmann_kappa=boltzmann_kappa)
+    helper_obj = _vDSSBJarzynskiErrorPropagationHelperClass(
+        temperature=temperature, boltzmann_kappa=boltzmann_kappa)
 
     out_mean, out_std = boot.mix_and_bootstrap(
         works_1,
         works_2,
         mixing_function=combine.combine_non_correlated_works,
         stat_function=helper_obj.calculate_jarzynski,
+        num_iterations=num_iterations)
+
+    return out_std, out_mean
+
+
+def plain_jarzynski_error_propagation(works,
+                                      *,
+                                      temperature=298.15,
+                                      boltzmann_kappa=0.001985875,
+                                      num_iterations=10000):
+    """jarzynski STD via bootstrap
+
+    it doesn't use the vDSSB aproach, but only the normal
+    one, for the rest it is 100% equal to `vDSSB_jarzynski_error_propagation`
+
+    Parameters
+    -------------
+    works : numpy.array
+        the work values
+    temperature : float, optional
+        the temperature in Kelvin at which the non equilibrium simulation
+        has been done, default 298.15 K
+    boltzmann_kappa : float
+        the Boltzmann constant, the dafault is 0.001985875 kcal/(mol⋅K)
+        and if you keep it the `works` shall be in Kcal
+    num_iterations : ins, optional, default=10000
+        the number of bootstrapping iterations (time and memory consuming)
+    """
+
+    helper_obj = _vDSSBJarzynskiErrorPropagationHelperClass(
+        temperature=temperature, boltzmann_kappa=boltzmann_kappa)
+
+    out_mean, out_std = boot.bootstrap_std_of_function_results(
+        works,
+        function=helper_obj.calculate_jarzynski,
         num_iterations=num_iterations)
 
     return out_std, out_mean
@@ -373,7 +447,7 @@ def gaussian_mixtures_free_energy(works,
 
 # by using this class I can choose the temp and K inside the bootstrapping function
 # had to put it outside the function to allow the use of multiprocessing
-class _GaussianMixturesHelperClass(object):
+class _vDSSBGaussianMixturesErrorPropagationHelperClass(object):
     """helper class
     """
     def __init__(self, temperature, boltzmann_kappa, n_gaussians, tol,
@@ -400,15 +474,15 @@ class _GaussianMixturesHelperClass(object):
         return energy
 
 
-def gaussian_mixtures_error_propagation(works_1,
-                                        works_2,
-                                        *,
-                                        temperature=298.15,
-                                        boltzmann_kappa=0.001985875,
-                                        num_iterations=50,
-                                        n_gaussians=3,
-                                        tol=1.E-6,
-                                        max_iterations=None):
+def VDSSB_gaussian_mixtures_error_propagation(works_1,
+                                              works_2,
+                                              *,
+                                              temperature=298.15,
+                                              boltzmann_kappa=0.001985875,
+                                              num_iterations=50,
+                                              n_gaussians=3,
+                                              tol=1.E-6,
+                                              max_iterations=None):
     """get STD of gaussian mixture free energy obtained by convolution of bound & unbound work
 
     uses vDSSB approach
@@ -428,7 +502,7 @@ def gaussian_mixtures_error_propagation(works_1,
     boltzmann_kappa : float
         the Boltzmann constant, the dafault is 0.001985875 kcal/(mol⋅K)
         and if you keep it the `works` shall be in Kcal
-    num_iterations : ins, optional, default=100
+    num_iterations : ins, optional, default=50
         the number of bootstrapping iterations (time and memory consuming)
     n_gaussians
         check `gaussian_mixtures_free_energy`
@@ -450,11 +524,12 @@ def gaussian_mixtures_error_propagation(works_1,
     `PythonFSDAM.bootstrapping.mix_and_bootstrap` function to do the bootstrapping
     """
 
-    helper_obj = _GaussianMixturesHelperClass(temperature=temperature,
-                                              boltzmann_kappa=boltzmann_kappa,
-                                              n_gaussians=n_gaussians,
-                                              tol=tol,
-                                              max_iterations=max_iterations)
+    helper_obj = _vDSSBGaussianMixturesErrorPropagationHelperClass(
+        temperature=temperature,
+        boltzmann_kappa=boltzmann_kappa,
+        n_gaussians=n_gaussians,
+        tol=tol,
+        max_iterations=max_iterations)
 
     out_mean, out_std = boot.mix_and_bootstrap(
         works_1,

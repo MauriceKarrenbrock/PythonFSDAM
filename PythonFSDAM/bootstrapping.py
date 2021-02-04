@@ -81,8 +81,8 @@ def _mix_and_bootstrap_helper_function(values_1, values_2, mixing_function,
     mixed_values = mixing_function(bs_values_1, bs_values_2)
 
     #try not to keep to much stuff in memory
-    bs_values_1 = None
-    bs_values_2 = None
+    del bs_values_1
+    del bs_values_2
 
     return stat_function(mixed_values)
 
@@ -141,7 +141,7 @@ def mix_and_bootstrap(
 
     #make input for parallel section
     input_values = []
-    for i in range(num_iterations):  # pylint: disable=unused-variable
+    for _ in range(num_iterations):
 
         input_values.append(
             (values_1, values_2, mixing_function, stat_function))
@@ -158,3 +158,52 @@ def mix_and_bootstrap(
 
     return np.mean(bootstapped_stat_function), np.std(
         bootstapped_stat_function)
+
+
+def _fake_mixing_function(values_1, _):
+    """dummy function
+
+    I use it to reuse `mix_and_bootstrap`
+
+    Returns
+    -----------
+    the first argument
+    """
+
+    return values_1
+
+
+def bootstrap_std_of_function_results(values,
+                                      *,
+                                      function=bs_stats.mean,
+                                      num_iterations=10000,
+                                      n_threads=None):
+    """bootstrap then apply the function then return mean and std
+
+    it boostraps values from `values` and then calculates the `function` on the obtained
+    values. Returns the mean and the STD of the obtained values
+
+    Parameters
+    -----------
+    values : numpy.array
+        the values to bootstrap
+    function : function(x)
+        the function that will process the bootstrapped values
+    for the other parameters check `mix_and_bootstrap`
+
+    Returns
+    -------------
+    mean, std : float, float
+
+    Notes
+    ---------
+    this function uses `mix_and_bootstrap`
+    """
+
+    return mix_and_bootstrap(
+        values,
+        np.array([1.]),  #dummy argument
+        mixing_function=_fake_mixing_function,
+        stat_function=function,
+        num_iterations=num_iterations,
+        n_threads=n_threads)

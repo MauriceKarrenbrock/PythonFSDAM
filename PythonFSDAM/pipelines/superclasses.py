@@ -505,7 +505,7 @@ class JarzynskiPostProcessingPipeline(PostProcessingPipeline):
             the new error
         """
 
-        STD, _ = free_energy_calculations.jarzynski_error_propagation(
+        STD, _ = free_energy_calculations.vDSSB_jarzynski_error_propagation(
             bound_works, unbound_works, temperature=self.temperature)
 
         return STD
@@ -573,7 +573,7 @@ class GaussianMixturesPostProcessingPipeline(PostProcessingPipeline):
             the new error
         """
 
-        STD, _ = free_energy_calculations.gaussian_mixtures_error_propagation(
+        STD, _ = free_energy_calculations.VDSSB_gaussian_mixtures_error_propagation(
             bound_works, unbound_works, temperature=self.temperature)
 
         return STD

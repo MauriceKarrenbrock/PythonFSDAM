@@ -35,6 +35,25 @@ class Testjarzynski_free_energy():
         m_log.assert_called()
 
 
+class Testweighted_jarzynski_free_energy():
+    def test_works(self, mocker):
+
+        works = np.zeros(5)
+        works += 2.
+        weights = np.zeros(5)
+        weights += 0.5
+
+        m_jarzynski = mocker.patch(
+            'PythonFSDAM.free_energy_calculations.jarzynski_free_energy',
+            return_value=2.)
+
+        output = free.weighted_jarzynski_free_energy(works, weights, 0., 1.)
+
+        assert output == 2.
+
+        m_jarzynski.assert_called_once()
+
+
 class Testvolume_correction():
     def test_calls(self, mocker):
 
@@ -61,7 +80,7 @@ class Testvolume_correction():
         m_log.assert_called_once()
 
 
-class Testjarzynski_error_propagation():
+class TestvDSSB_jarzynski_error_propagation():
     def test_works(self, mocker):
 
         m_boot = mocker.patch('PythonFSDAM.bootstrapping.mix_and_bootstrap',
@@ -70,8 +89,27 @@ class Testjarzynski_error_propagation():
         mocker.patch(
             'PythonFSDAM.free_energy_calculations.jarzynski_free_energy')
 
-        output = free.jarzynski_error_propagation([1], [2])
+        output = free.vDSSB_jarzynski_error_propagation([1], [2])
 
         assert output == (2, 1)
 
         m_boot.assert_called_once()
+
+
+class Testplain_jarzynski_error_propagation():
+    def test_works(self, mocker):
+
+        m_heper = mocker.patch(
+            'PythonFSDAM.free_energy_calculations._vDSSBJarzynskiErrorPropagationHelperClass'
+        )
+
+        m_std = mocker.patch(
+            'PythonFSDAM.bootstrapping.bootstrap_std_of_function_results',
+            return_value=(1, 2))
+
+        assert free.plain_jarzynski_error_propagation(np.array([3.,
+                                                                4.])) == (2, 1)
+
+        m_heper.assert_called_once()
+
+        m_std.assert_called_once()

@@ -149,3 +149,26 @@ class Test_mix_and_bootstrap_helper_function():
         m_random_generator.choice.assert_called()
 
         assert output == 1.
+
+
+class Test_fake_mixing_function():
+    def test_works(self):
+
+        assert boot._fake_mixing_function(1., 2.) == 1.
+
+
+class Testbootstrap_std_of_function_results():
+    def test_works(self, mocker):
+
+        m_mix = mocker.patch('PythonFSDAM.bootstrapping.mix_and_bootstrap',
+                             return_value=(1., 2.))
+
+        output = boot.bootstrap_std_of_function_results(
+            np.array([1., 2., 3.]),
+            function='dummy_function',
+            num_iterations=10000,
+            n_threads=None)
+
+        assert output == (1., 2.)
+
+        m_mix.assert_called_once()
