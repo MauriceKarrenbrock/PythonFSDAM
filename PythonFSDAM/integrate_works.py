@@ -10,6 +10,71 @@
 
 import numpy as np
 
+import PythonFSDAM.parse.parse as _parse
+
+
+def integrate_multiple_work_files(work_files,
+                                  md_program='gromacs',
+                                  creation=True):
+    """convenience function to parse and integrate many work files
+
+    this is a convenient and quick high level function, it depends on the
+    other functions and classes in this module and in the `parse` module
+
+    Parameters
+    -------------
+    work_files : iterable of str or path
+        the files containing the work values
+    md_program : str, default=gromacs
+        the md program that created the file, in order to know which parser to
+        use, check the `parse` module to see which ones are supported
+    creation : bool, optional, default=True
+        it is only used for the kind of md programs that print the
+        work values in function of time and not of lambda
+        if creation=True the function will take for granted that
+        lambda went linearly from 0 to 1, viceversa for creation=False
+
+    Returns
+    ------------
+    numpy.array
+        the values of the integrated works in the same order as in input
+    """
+
+    if creation:
+
+        starting_lambda = 0.
+        ending_lambda = 1.
+
+    else:
+
+        starting_lambda = 1.
+        ending_lambda = 0.
+
+    dhdl_parser = _parse.ParseWorkProfile(md_program)
+
+    work_integrator = WorkResults(len(work_files))
+
+    for file_name in work_files:
+
+        #it is needed for some programs like gromacs
+        #that don't print the values of lambda but print the time
+        #and therefore the value of lambda must be calculated
+        #by the parser
+        try:
+
+            lambda_work_value = dhdl_parser.parse(  # pylint: disable=unexpected-keyword-arg
+                file_name,
+                starting_lambda=starting_lambda,
+                ending_lambda=ending_lambda)
+
+        except TypeError:
+
+            lambda_work_value = dhdl_parser.parse(file_name)
+
+        work_integrator.integrate_and_add(lambda_work_value)
+
+    return work_integrator.get_work_values()
+
 
 def integrate_work_profiles(lambda_work):
     """Integrates the work profiles with numpy.trapz

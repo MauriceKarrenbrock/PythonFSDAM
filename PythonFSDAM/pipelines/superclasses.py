@@ -22,6 +22,342 @@ import PythonFSDAM.purge_outliers as purge_outliers
 
 # pylint: disable=too-many-statements
 
+################################################
+# MixIn classes
+################################################
+
+
+class IntegrateWorksMixIn(object):
+    """MixIn class to integrate work values and files
+    """
+    @staticmethod
+    def integrate_work_files(file_names, md_program, creation):
+        """integrate many work files
+
+        it is a wrapper of `PythonFSDAM.integrate_works.integrate_multiple_work_files`
+        function, check it's documentation for more
+        """
+
+        return integrate_works.integrate_multiple_work_files(
+            work_files=file_names, md_program=md_program, creation=creation)
+
+
+class FreeEnergyCorrectionsMixIn(object):
+    """MixIn for volume, orientational, ... corrections to free energy
+    """
+    @staticmethod
+    def volume_com_com_correction(distance_file, temperature, md_program):
+        """make volume correction for COM-COM weak restraints (COM=center of mass)
+
+        it is a wrapper of the `PythonFSDAM.parse.parse.ParseCOMCOMDistanceFile`
+        and `PythonFSDAM.free_energy_calculations.volume_correction` functions
+
+        it takes for granted you have a COM COM restraint
+        and uses the COM COM distance to make a correction
+
+        Parameters
+        ------------
+        distance_file : pathlib.Path
+            the file containing the com-com distances
+        temperature : float
+            temperature in kelvin
+        md_program : str
+            the md program that created the files
+
+        Returns
+        ---------------
+        free_energy_correction : float
+            in Kcal/mol
+        """
+
+        parser = parse.ParseCOMCOMDistanceFile(md_program)
+
+        distances = parser.parse(distance_file)
+
+        free_energy_correction = free_energy_calculations.volume_correction(
+            distances, temperature)
+
+        return free_energy_correction
+
+
+class FreeEnergyMixInSuperclass(object):
+    """superclass for free energy mixins
+
+    useful for abstract pipeline superclasses
+    """
+    @staticmethod
+    def calculate_free_energy(works, temperature):
+        """calculate the Jarzynski free energy
+
+        Parameters
+        ------------
+        works : numpy.array
+            the work values in Kcal/mol
+        temperature : float
+            kelvin
+
+        Returns
+        --------------
+        free_energy : float
+            Kcal/mol
+        """
+
+        #Avoid problems with possible ill defined multiple inheritances
+        try:
+
+            return super().calculate_free_energy(works, temperature)
+
+        except AttributeError:
+
+            raise NotImplementedError(
+                'Need to define this abstract method') from None
+
+    def vdssb_calculate_free_energy(self, works_1, works_2, temperature):
+        """calculate the Jarzynski free energy vDSSB
+
+        Parameters
+        ------------
+        works_1 : numpy.array
+            the work values in Kcal/mol
+        works_2 : numpy.array
+            the work values in Kcal/mol
+        temperature : float
+            kelvin
+
+        Returns
+        --------------
+        free_energy : float
+            Kcal/mol
+        """
+
+        #Avoid problems with possible ill defined multiple inheritances
+        try:
+
+            return super().vdssb_calculate_free_energy(works_1, works_2,
+                                                       temperature)
+
+        except AttributeError:
+
+            raise NotImplementedError(
+                'Need to define this abstract method') from None
+
+    @staticmethod
+    def calculate_standard_deviation(works, temperature):
+        """calculates STD of the free energy with bootstrapping
+
+        it is a wrapper of `PythonFSDAM.free_energy_calculations.plain_jarzynski_error_propagation`
+        """
+
+        #Avoid problems with possible ill defined multiple inheritances
+        try:
+
+            return super().calculate_standard_deviation(works, temperature)
+
+        except AttributeError:
+
+            raise NotImplementedError(
+                'Need to define this abstract method') from None
+
+    @staticmethod
+    def vdssb_calculate_standard_deviation(works_1, works_2, temperature):
+        """calculates STD of the free energy with bootstrapping vDSSB
+
+        it is a wrapper of `PythonFSDAM.free_energy_calculations.vDSSB_jarzynski_error_propagation`
+        """
+
+        #Avoid problems with possible ill defined multiple inheritances
+        try:
+
+            return super().vdssb_calculate_standard_deviation(
+                works_1, works_2, temperature)
+
+        except AttributeError:
+
+            raise NotImplementedError(
+                'Need to define this abstract method') from None
+
+
+class JarzynskiFreeEnergyMixIn(FreeEnergyMixInSuperclass):
+    """MixIn that implements the Jarzynski theorem
+
+    contains the methods needed both for the standard and vDSSB
+    approach
+
+    the vDSSB methods will contain vdssb in the method name
+
+    Notes
+    ------------
+    implements the abstract class `FreeEnergyMixInSuperclass`
+    """
+    @staticmethod
+    def calculate_free_energy(works, temperature):
+        """calculate the Jarzynski free energy
+
+        Parameters
+        ------------
+        works : numpy.array
+            the work values in Kcal/mol
+        temperature : float
+            kelvin
+
+        Returns
+        --------------
+        free_energy : float
+            Kcal/mol
+        """
+
+        free_energy = free_energy_calculations.jarzynski_free_energy(
+            works, temperature)
+
+        return free_energy
+
+    def vdssb_calculate_free_energy(self, works_1, works_2, temperature):
+        """calculate the Jarzynski free energy vDSSB
+
+        Parameters
+        ------------
+        works_1 : numpy.array
+            the work values in Kcal/mol
+        works_2 : numpy.array
+            the work values in Kcal/mol
+        temperature : float
+            kelvin
+
+        Returns
+        --------------
+        free_energy : float
+            Kcal/mol
+        """
+
+        works = combine_works.combine_non_correlated_works(works_1, works_2)
+
+        free_energy = self.calculate_free_energy(works, temperature)
+
+        return free_energy
+
+    @staticmethod
+    def calculate_standard_deviation(works, temperature):
+        """calculates STD of the free energy with bootstrapping
+
+        it is a wrapper of `PythonFSDAM.free_energy_calculations.plain_jarzynski_error_propagation`
+        """
+
+        STD, _ = free_energy_calculations.plain_jarzynski_error_propagation(
+            works, temperature=temperature)
+
+        return STD
+
+    @staticmethod
+    def vdssb_calculate_standard_deviation(works_1, works_2, temperature):
+        """calculates STD of the free energy with bootstrapping vDSSB
+
+        it is a wrapper of `PythonFSDAM.free_energy_calculations.vDSSB_jarzynski_error_propagation`
+        """
+
+        STD, _ = free_energy_calculations.vDSSB_jarzynski_error_propagation(
+            works_1, works_2, temperature=temperature)
+
+        return STD
+
+
+class GaussianMixtureFreeEnergyMixIn(FreeEnergyMixInSuperclass):
+    """MixIn for gaussian mixtures free energy calcutations
+
+    for both vDSSB and standard
+
+    TODO standard gaussian mixtures
+    """
+    def _write_gaussians(self, gaussians, log_likelyhood):
+        """private"""
+
+        lines = []
+
+        lines.append(
+            f'#each line is a gaussian, log likelyhood = {log_likelyhood}\n')
+        lines.append('mean,sigma,coefficient\n')
+
+        for gaussian in gaussians:
+
+            lines.append(
+                f'{gaussian["mu"]:.18e},{gaussian["sigma"]:.18e},{gaussian["lambda"]:.18e}\n'
+            )
+
+        _write.write_file(lines, f'{str(self)}_gaussians.csv')
+
+    @staticmethod
+    def calculate_free_energy(works, temperature):
+        """calculate the gaussian mixtures free energy
+
+        Parameters
+        ------------
+        works : numpy.array
+            the work values in Kcal/mol
+        temperature : float
+            kelvin
+
+        Returns
+        --------------
+        free_energy : float
+            Kcal/mol
+        """
+
+        raise NotImplementedError
+
+    def vdssb_calculate_free_energy(self, works_1, works_2, temperature):
+        """calculate the gaussian mixtures free energy vDSSB
+
+        Parameters
+        ------------
+        works_1 : numpy.array
+            the work values in Kcal/mol
+        works_2 : numpy.array
+            the work values in Kcal/mol
+        temperature : float
+            kelvin
+
+        Returns
+        --------------
+        free_energy : float
+            Kcal/mol
+        """
+
+        works = combine_works.combine_non_correlated_works(works_1, works_2)
+
+        energy, gaussians, log_likelyhood = free_energy_calculations.gaussian_mixtures_free_energy(
+            works, temperature)
+
+        #in order to be able to check the quality of the fit
+        self._write_gaussians(gaussians, log_likelyhood)
+
+        return energy
+
+    @staticmethod
+    def calculate_standard_deviation(works, temperature):
+        """calculates STD of the free energy with bootstrapping
+
+        it is a wrapper of `PythonFSDAM.free_energy_calculations.TODO`
+        """
+
+        raise NotImplementedError
+
+    @staticmethod
+    def vdssb_calculate_standard_deviation(works_1, works_2, temperature):
+        """calculates STD of the free energy with bootstrapping vDSSB
+
+        it is a wrapper of
+        `PythonFSDAM.free_energy_calculations.VDSSB_gaussian_mixtures_error_propagation`
+        """
+
+        STD, _ = free_energy_calculations.VDSSB_gaussian_mixtures_error_propagation(
+            works_1, works_2, temperature=temperature)
+
+        return STD
+
+
+################################################
+# END MixIn classes
+################################################
+
 
 class Pipeline(object):
     """The generic superclass for pipelines
@@ -128,11 +464,147 @@ class PreProcessingPipeline(Pipeline):
         """
 
 
-class PostProcessingPipeline(Pipeline):
-    """The superclass of all the postprocessing classes
+class PostProcessingSuperclass(Pipeline, FreeEnergyMixInSuperclass,
+                               FreeEnergyCorrectionsMixIn,
+                               IntegrateWorksMixIn):
+    """the abstract superclass for posr processing without vDSSB
 
-    in the end you will obtain a free energy and a confidence intrvall
-    other details might be subclass dependent
+    Inherits from `Pipeline` `FreeEnergyMixInSuperclass`
+    `FreeEnergyCorrectionsMixIn` `IntegrateWorksMixIn`
+
+    subclasses must define the methods of the abstract `FreeEnergyMixInSuperclass`
+    superclass
+
+    Parameters
+    -------------
+    dhdl_files : list of pathlib.Path
+        the files with the lambda and dH/dL values,
+        if the md program you are using forces
+        you to annihilate in 2 different runs (q and vdw) like gromacs
+        use a nested list, in any case check out the specific subclass
+        documentation
+    vol_correction_distances : pathlib.Path, optional
+        if you have put a COM-COM restrain between the protein and the ligand
+        you will have to make a volume correction to the free energy, and to do
+        it a distance file obtained from the previous enhanced sampling run might be
+        needed. If you leave it blank no volume correction will be done (can always do it
+        later on your own)
+    md_program : str, default=gromacs
+        the md program that created the output to post-process
+        in some cases you can use a superclass directly by setting the right
+        `md_program` in other cases you will need to use some subclass
+    creation : bool, optional, default=True
+        it is only used for the kind of md programs that print the
+        work values in function of time and not of lambda
+        if creation=True the class will take for granted that
+        lambda went linearly from 0 to 1, viceversa for creation=False
+
+    Methods
+    -----------
+    execute()
+        the only public method
+    """
+    def __init__(self,
+                 dhdl_files,
+                 vol_correction_distances=None,
+                 temperature=298.15,
+                 md_program='gromacs',
+                 creation=True):
+
+        self.dhdl_files = dhdl_files
+
+        self.vol_correction_distances = vol_correction_distances
+
+        self.temperature = temperature
+
+        self.md_program = md_program
+
+        self.creation = creation
+
+        self._free_energy_value = 0.
+
+    def __str__(self):
+
+        return 'not_defined_pipeline'
+
+    def execute(self):
+        """calculate free energy
+
+        Returns
+        ---------
+        free_energy, STD : float, float
+            the free energy and the standard deviation
+        """
+
+        number_of_subruns = 1
+        #understand if the bound and unbound runs where made in one or multiple runs
+        if hasattr(self.dhdl_files[0], '__iter__') and not \
+            isinstance(self.dhdl_files[0], str):
+
+            number_of_subruns = len(self.dhdl_files)
+
+        #will become a numpy array
+        work_values = 0.
+        for i in range(number_of_subruns):
+
+            if number_of_subruns > 1:
+
+                dhdl_tmp = self.dhdl_files[i]
+
+            else:
+
+                dhdl_tmp = self.dhdl_files
+
+            work_values += self.integrate_work_files(
+                file_names=dhdl_tmp,
+                creation=self.creation,
+                md_program=self.md_program)
+
+        z_score = 3.0
+        work_values = purge_outliers.purge_outliers_zscore(work_values,
+                                                           z_score=z_score)
+
+        np.savetxt('work_values.dat',
+                   work_values,
+                   header=('work_values work values Kcal/mol '
+                           f'(outliers with z score > {z_score} were purged)'))
+
+        self._free_energy_value += self.calculate_free_energy(
+            work_values, temperature=self.temperature)
+
+        #volume correction
+        if self.vol_correction_distances is not None:
+
+            for file_name in self.vol_correction_distances:
+
+                self._free_energy_value += self.volume_com_com_correction(
+                    distance_file=file_name,
+                    temperature=self.temperature,
+                    md_program=self.md_program)
+
+        STD = self.calculate_standard_deviation(work_values,
+                                                temperature=self.temperature)
+
+        # print the values of delta G and the confidence intervall (95%)
+        lines = [
+            f'# {str(self)}\n',
+            '# Delta_G  STD  confidence_intervall_95%(1.96STD)  unit=Kcal/mol\n',
+            f'{self._free_energy_value:.18e} {STD:.18e} {1.96*STD:.18e}\n'
+        ]
+        _write.write_file(lines, f'{str(self)}_free_energy.dat')
+
+        return self._free_energy_value, STD
+
+
+class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
+                                  FreeEnergyCorrectionsMixIn,
+                                  IntegrateWorksMixIn):
+    """The class for vDSDB postprocessing
+
+    in the end you will obtain a free energy and a confidence intervall
+
+    Inherits from `Pipeline` `FreeEnergyMixInSuperclass`
+    `FreeEnergyCorrectionsMixIn` `IntegrateWorksMixIn`
 
     Parameters
     -------------
@@ -140,14 +612,12 @@ class PostProcessingPipeline(Pipeline):
         the files with the lambda and dH/dL values for the
         bound state, if the md program you are using forces
         you to annihilate in 2 different runs (q and vdw) like gromacs
-        use a nested list, in any case check out the specific subclass
-        documentation
+        use a nested list
     unbound_state_dhdl : list of pathlib.Path
         the files with the lambda and dH/dL values for the
         unbound state, if the md program you are using forces
         you to create in 2 different runs (q and vdw) like gromacs
-        use a nested list, in any case check out the specific subclass
-        documentation
+        use a nested list
     vol_correction_distances_bound_state : pathlib.Path, optional
         if you have put a COM-COM restrain between the protein and the ligand
         you will have to make a volume correction to the free energy, and to do
@@ -185,123 +655,11 @@ class PostProcessingPipeline(Pipeline):
 
         self.md_program = md_program
 
-        self._free_energy_value = 0
+        self._free_energy_value = 0.
 
     def __str__(self):
 
-        return 'not_defined_pipeline'
-
-    def _calculate_free_energy(self, works):
-        """Calculates the free energy somehow
-
-        it is a hook for subclasses and it must
-        update `self._free_energy_value`
-
-        Parameters
-        -------------
-        works : numpy.array
-            the work values
-        """
-
-        raise NotImplementedError
-
-    def _propagate_error(self, bound_works, unbound_works):
-        """propagates the error
-
-        according to `calculate_free_energy` or better to what is
-        implemented inside it in the subclass the error will be
-        propagated accordingly in this method
-
-        Parameters
-        -------------
-        error : float
-            the value of the error before the free energy calculation
-        works : numpy.array, optional, default=None
-            some error propagations might need the work values
-
-        Returns
-        -----------
-        float
-            the new error
-        """
-
-        raise NotImplementedError
-
-    def _calculate_free_energy_volume_correction(self):
-        """Calculates the free energy volume correction for a position restraint
-
-        it takes for granted you have a COM COM restraint
-        and uses the COM COM distance to make a correction
-
-        Parameters
-        ------------
-        distance_file : pathlib.Path
-            the file containing the distance values
-            they must be in Angstrom and will return in Kcal/mol
-        """
-
-        files = [
-            self.vol_correction_distances_bound_state,
-            self.vol_correction_distances_unbound_state
-        ]
-
-        distances = []
-
-        parser = parse.ParseCOMCOMDistanceFile(self.md_program)
-
-        for i in files:
-
-            if i is not None:
-
-                distances.append(parser.parse(i))
-
-        for dist in distances:
-
-            energy = free_energy_calculations.volume_correction(
-                dist, self.temperature)
-
-            self._free_energy_value += energy
-
-    @staticmethod
-    def _integrate_work_helper_function(dhdl_parser, work_integrator,
-                                        file_list, creation):
-        """PRIVATE
-        """
-
-        #it is needed for some programs like gromacs
-        #that don't print the values of lambda but print the time
-        #and therefore the value of lambda must be calculated
-        #by the parser
-        if creation:
-
-            starting_lambda = 0.
-            ending_lambda = 1.
-
-        else:
-
-            starting_lambda = 1.
-            ending_lambda = 0.
-
-        for file_name in file_list:
-
-            #it is needed for some programs like gromacs
-            #that don't print the values of lambda but print the time
-            #and therefore the value of lambda must be calculated
-            #by the parser
-            try:
-
-                lambda_work_value = dhdl_parser.parse(
-                    file_name,
-                    starting_lambda=starting_lambda,
-                    ending_lambda=ending_lambda)
-
-            except TypeError:
-
-                lambda_work_value = dhdl_parser.parse(file_name)
-
-            work_integrator.integrate_and_add(lambda_work_value)
-
-        return work_integrator
+        return 'vDSSB_not_defined_pipeline'
 
     def execute(self):
         """Calculates the free energy
@@ -312,15 +670,11 @@ class PostProcessingPipeline(Pipeline):
             free energy, STD
         """
 
-        bound_multiple_runs = False
-        unbound_multiple_runs = False
         number_of_bound_subruns = 1
         number_of_unbound_subruns = 1
         #understand if the bound and unbound runs where made in one or multiple runs
         if hasattr(self.bound_state_dhdl[0], '__iter__') and not \
             isinstance(self.bound_state_dhdl[0], str):
-
-            bound_multiple_runs = True
 
             number_of_bound_subruns = len(self.bound_state_dhdl)
 
@@ -328,133 +682,105 @@ class PostProcessingPipeline(Pipeline):
         if hasattr(self.unbound_state_dhdl[0], '__iter__') and not \
             isinstance(self.unbound_state_dhdl[0], str):
 
-            unbound_multiple_runs = True
-
             number_of_unbound_subruns = len(self.unbound_state_dhdl)
 
-        dhdl_parser = parse.ParseWorkProfile(self.md_program)
+        #will become a numpy array
+        bound_work_values = 0.
+        for i in range(number_of_bound_subruns):
 
-        bound_works_calculate = []
-        for i in range(number_of_bound_subruns):  # pylint: disable=unused-variable
+            if number_of_bound_subruns > 1:
 
-            if bound_multiple_runs:
-
-                bound_works_calculate.append(
-                    integrate_works.WorkResults(len(self.bound_state_dhdl[0])))
+                dhdl_tmp = self.bound_state_dhdl[i]
 
             else:
-                bound_works_calculate.append(
-                    integrate_works.WorkResults(len(self.bound_state_dhdl)))
 
-        # parse integrate and save the bound work values
-        if bound_multiple_runs:
+                dhdl_tmp = self.bound_state_dhdl
 
-            for i, file_list in enumerate(self.bound_state_dhdl):
+            bound_work_values += self.integrate_work_files(
+                file_names=dhdl_tmp,
+                creation=False,
+                md_program=self.md_program)
 
-                bound_works_calculate[
-                    i] = self._integrate_work_helper_function(
-                        dhdl_parser=dhdl_parser,
-                        work_integrator=bound_works_calculate[i],
-                        file_list=file_list,
-                        creation=False)
+        #will become a numpy array
+        unbound_work_values = 0.
+        for i in range(number_of_unbound_subruns):
 
-        else:
+            if number_of_unbound_subruns > 1:
 
-            bound_works_calculate[0] = self._integrate_work_helper_function(
-                dhdl_parser=dhdl_parser,
-                work_integrator=bound_works_calculate[0],
-                file_list=self.bound_state_dhdl,
-                creation=False)
+                dhdl_tmp = self.unbound_state_dhdl[i]
 
-        bound_work_values = 0.  #will become a numpy array
-        for i in bound_works_calculate:
+            else:
 
-            bound_work_values += i.get_work_values()
+                dhdl_tmp = self.unbound_state_dhdl
 
-        #free memory, this arrays can be quite big
-        del bound_works_calculate
+            unbound_work_values += self.integrate_work_files(
+                file_names=dhdl_tmp, creation=True, md_program=self.md_program)
+
+        #purge outliers
+        z_score = 3.0
 
         bound_work_values = purge_outliers.purge_outliers_zscore(
-            bound_work_values, z_score=3.0)
+            bound_work_values, z_score=z_score)
+
+        unbound_work_values = purge_outliers.purge_outliers_zscore(
+            unbound_work_values, z_score=z_score)
 
         # print a backup to file
         np.savetxt('bound_work_values.dat',
                    bound_work_values,
-                   header=('bound work values after z score purging Kcal/mol'))
+                   header=('bound work values after z score purging Kcal/mol '
+                           f'(outliers with z score > {z_score} were purged)'))
 
-        ############################################################
-
-        ############################################################
-
-        #do everything again for unbound works
-        unbound_works_calculate = []
-        for i in range(number_of_unbound_subruns):  # pylint: disable=unused-variable
-
-            if unbound_multiple_runs:
-
-                unbound_works_calculate.append(
-                    integrate_works.WorkResults(len(
-                        self.unbound_state_dhdl[0])))
-
-            else:
-                unbound_works_calculate.append(
-                    integrate_works.WorkResults(len(self.unbound_state_dhdl)))
-
-        # parse integrate and save the bound work values
-        if unbound_multiple_runs:
-
-            for i, file_list in enumerate(self.unbound_state_dhdl):
-
-                unbound_works_calculate[
-                    i] = self._integrate_work_helper_function(
-                        dhdl_parser=dhdl_parser,
-                        work_integrator=unbound_works_calculate[i],
-                        file_list=file_list,
-                        creation=True)
-
-        else:
-
-            unbound_works_calculate[0] = self._integrate_work_helper_function(
-                dhdl_parser=dhdl_parser,
-                work_integrator=unbound_works_calculate[0],
-                file_list=self.unbound_state_dhdl,
-                creation=True)
-
-        unbound_work_values = 0.  #will become a numpy array
-        for i in unbound_works_calculate:
-
-            unbound_work_values += i.get_work_values()
-
-        #free memory, this arrays can be quite big
-        del unbound_works_calculate
-
-        unbound_work_values = purge_outliers.purge_outliers_zscore(
-            unbound_work_values, z_score=3.0)
-
-        # print a backup to file
         np.savetxt(
             'unbound_work_values.dat',
             unbound_work_values,
-            header=('unbound work values after z score purging Kcal/mol'))
+            header=('unbound work values after z score purging Kcal/mol '
+                    f'(outliers with z score > {z_score} were purged)'))
 
-        combined_work_values = \
-            combine_works.combine_non_correlated_works(bound_work_values, unbound_work_values)
+        #get STD
+        STD = self.vdssb_calculate_standard_deviation(
+            bound_work_values,
+            unbound_work_values,
+            temperature=self.temperature)
+
+        #get free energy
+        self._free_energy_value += self.vdssb_calculate_free_energy(
+            bound_work_values,
+            unbound_work_values,
+            temperature=self.temperature)
+
+        #make a backup of the combined work values
+        combined_work_values = (combine_works.combine_non_correlated_works(
+            bound_work_values, unbound_work_values))
+
+        del bound_work_values
+        del unbound_work_values
 
         # print a backup to file
         np.savetxt('combined_work_values.dat',
                    combined_work_values,
                    header=('combined_work_values work values Kcal/mol'))
 
-        #combine the bound and unbound work values and get a 2sigma (95%) confidence intarvall
-        STD = self._propagate_error(bound_work_values, unbound_work_values)
+        del combined_work_values
 
-        del bound_work_values
-        del unbound_work_values
+        #volume correction
+        if self.vol_correction_distances_bound_state is not None:
 
-        #subclass dependent
-        self._calculate_free_energy(combined_work_values)
+            for file_name in self.vol_correction_distances_bound_state:
 
-        self._calculate_free_energy_volume_correction()
+                self._free_energy_value += self.volume_com_com_correction(
+                    distance_file=file_name,
+                    temperature=self.temperature,
+                    md_program=self.md_program)
+
+        if self.vol_correction_distances_unbound_state is not None:
+
+            for file_name in self.vol_correction_distances_unbound_state:
+
+                self._free_energy_value += self.volume_com_com_correction(
+                    distance_file=file_name,
+                    temperature=self.temperature,
+                    md_program=self.md_program)
 
         # print the values of delta G and the confidence intervall (2 sigma)
         lines = [
@@ -467,52 +793,26 @@ class PostProcessingPipeline(Pipeline):
         return self._free_energy_value, STD
 
 
-class JarzynskiPostProcessingPipeline(PostProcessingPipeline):
-    """subclass of `PostProcessingPipeline` that calculates free energy with  Jarzynski
+class JarzynskiVDSSBPostProcessingPipeline(VDSSBPostProcessingPipeline,
+                                           JarzynskiFreeEnergyMixIn):
+    """calculates free energy with  Jarzynski and the vDSSB method
+
+    subclass of `VDSSBPostProcessingPipeline` and `JarzynskiFreeEnergyMixIn` that
 
     The distances for this class must be in Angstrom and the energies will always be in
     Kcal/mol
+
+    This class elaborates bound and unbound state toghether, that is very different from
+    the not vDSSB one
     """
     def __str__(self):
 
-        return 'jarzynski_pipeline'
-
-    def _calculate_free_energy(self, works):
-        """Calculates the free energy with Jarzinky
-
-        Parameters
-        -------------
-        works : numpy.array
-            the work values
-        """
-
-        energy = free_energy_calculations.jarzynski_free_energy(
-            works, self.temperature)
-
-        self._free_energy_value += energy
-
-    def _propagate_error(self, bound_works, unbound_works):
-        """propagates the error for Jarzynski
-
-        Parameters
-        -------------
-        error : float
-            the value of the error before the free energy calculation
-
-        Returns
-        -----------
-        float
-            the new error
-        """
-
-        STD, _ = free_energy_calculations.vDSSB_jarzynski_error_propagation(
-            bound_works, unbound_works, temperature=self.temperature)
-
-        return STD
+        return 'vDSSB_jarzynski_pipeline'
 
 
-class GaussianMixturesPostProcessingPipeline(PostProcessingPipeline):
-    """subclass of `PostProcessingPipeline` that calculates free energy with  gaussian mixtures
+class GaussianMixturesVDSSBPostProcessingPipeline(  # pylint: disable=abstract-method #TODO
+        VDSSBPostProcessingPipeline, GaussianMixtureFreeEnergyMixIn):  # pylint: disable=abstract-method #TODO
+    """subclass of `VDSSBPostProcessingPipeline` that calculates free energy with  gaussian mixtures
 
     The distances for this class must be in Angstrom and the energies will always be in
     Kcal/mol
@@ -524,56 +824,19 @@ class GaussianMixturesPostProcessingPipeline(PostProcessingPipeline):
     """
     def __str__(self):
 
-        return 'gaussian_mixtures_pipeline'
+        return 'vDSSB_gaussian_mixtures_pipeline'
 
-    def _write_gaussians(self, gaussians, log_likelyhood):
-        """private"""
 
-        lines = []
+class JarzynskiPostProcessingAlchemicalLeg(PostProcessingSuperclass,
+                                           JarzynskiFreeEnergyMixIn):
+    """post processing class for plain jarzynski (no vDSSB)
 
-        lines.append(
-            f'#each line is a gaussian, log likelyhood = {log_likelyhood}\n')
-        lines.append('mean,sigma,coefficient\n')
+    this class post processes only a single alchemical leg (creation or annihilation)
+    note that this behaviour is very different from his vDSSB counterpart that
+    post processes everything together
 
-        for gaussian in gaussians:
+    see documentation for `PostProcessingSuperclass` and `JarzynskiFreeEnergyMixIn`
+    """
+    def __str__(self):
 
-            lines.append(
-                f'{gaussian["mu"]:.18e},{gaussian["sigma"]:.18e},{gaussian["lambda"]:.18e}\n'
-            )
-
-        _write.write_file(lines, f'{str(self)}_gaussians.csv')
-
-    def _calculate_free_energy(self, works):
-        """Calculates the free energy with Jarzinky
-
-        Parameters
-        -------------
-        works : numpy.array
-            the work values
-        """
-
-        energy, gaussians, log_likelyhood = free_energy_calculations.gaussian_mixtures_free_energy(
-            works, self.temperature)
-
-        self._write_gaussians(gaussians, log_likelyhood)
-
-        self._free_energy_value += energy
-
-    def _propagate_error(self, bound_works, unbound_works):
-        """propagates the error for Jarzynski
-
-        Parameters
-        -------------
-        error : float
-            the value of the error before the free energy calculation
-
-        Returns
-        -----------
-        float
-            the new error
-        """
-
-        STD, _ = free_energy_calculations.VDSSB_gaussian_mixtures_error_propagation(
-            bound_works, unbound_works, temperature=self.temperature)
-
-        return STD
+        return 'standard_jarzynski_pipeline'
