@@ -41,6 +41,55 @@ class IntegrateWorksMixIn(object):
         return integrate_works.integrate_multiple_work_files(
             work_files=file_names, md_program=md_program, creation=creation)
 
+    def get_purged_work_values(self, dhdl_files, md_program, creation,
+                               z_score):
+        """convenience method to get work values
+
+        the work values are already purged with z score
+
+        Parameters
+        --------------
+        dhdl_files : list of pathlib.Path or nested list of pathlib.Path
+        md_program : str
+            the md program that created the dhdl files
+        creation : bool
+            check `PythonFSDAM.integrate_works.integrate_multiple_work_files`
+        z_score : float
+            check `PythonFSDAM.purge_outliers.purge_outliers_zscore`
+
+        Returns
+        -----------
+        numpy.array
+        """
+
+        number_of_subruns = 1
+        #understand if the bound and unbound runs where made in one or multiple runs
+        if hasattr(dhdl_files[0], '__iter__') and not \
+            isinstance(dhdl_files[0], str):
+
+            number_of_subruns = len(dhdl_files)
+
+        #will become a numpy array
+        work_values = 0.
+        for i in range(number_of_subruns):
+
+            if number_of_subruns > 1:
+
+                dhdl_tmp = dhdl_files[i]
+
+            else:
+
+                dhdl_tmp = dhdl_files
+
+            work_values += self.integrate_work_files(file_names=dhdl_tmp,
+                                                     creation=creation,
+                                                     md_program=md_program)
+
+        work_values = purge_outliers.purge_outliers_zscore(work_values,
+                                                           z_score=z_score)
+
+        return work_values
+
 
 class FreeEnergyCorrectionsMixIn(object):
     """MixIn for volume, orientational, ... corrections to free energy
@@ -537,33 +586,11 @@ class PostProcessingSuperclass(Pipeline, FreeEnergyMixInSuperclass,
             the free energy and the standard deviation
         """
 
-        number_of_subruns = 1
-        #understand if the bound and unbound runs where made in one or multiple runs
-        if hasattr(self.dhdl_files[0], '__iter__') and not \
-            isinstance(self.dhdl_files[0], str):
-
-            number_of_subruns = len(self.dhdl_files)
-
-        #will become a numpy array
-        work_values = 0.
-        for i in range(number_of_subruns):
-
-            if number_of_subruns > 1:
-
-                dhdl_tmp = self.dhdl_files[i]
-
-            else:
-
-                dhdl_tmp = self.dhdl_files
-
-            work_values += self.integrate_work_files(
-                file_names=dhdl_tmp,
-                creation=self.creation,
-                md_program=self.md_program)
-
         z_score = 3.0
-        work_values = purge_outliers.purge_outliers_zscore(work_values,
-                                                           z_score=z_score)
+        work_values = self.get_purged_work_values(self.dhdl_files,
+                                                  md_program=self.md_program,
+                                                  creation=self.creation,
+                                                  z_score=z_score)
 
         np.savetxt('work_values.dat',
                    work_values,
@@ -671,60 +698,24 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
             free energy, STD
         """
 
-        number_of_bound_subruns = 1
-        number_of_unbound_subruns = 1
-        #understand if the bound and unbound runs where made in one or multiple runs
-        if hasattr(self.bound_state_dhdl[0], '__iter__') and not \
-            isinstance(self.bound_state_dhdl[0], str):
+        #calculate and purge outliers (zscore > z_score)
+        #for bound and unbound work
 
-            number_of_bound_subruns = len(self.bound_state_dhdl)
-
-
-        if hasattr(self.unbound_state_dhdl[0], '__iter__') and not \
-            isinstance(self.unbound_state_dhdl[0], str):
-
-            number_of_unbound_subruns = len(self.unbound_state_dhdl)
-
-        #will become a numpy array
-        bound_work_values = 0.
-        for i in range(number_of_bound_subruns):
-
-            if number_of_bound_subruns > 1:
-
-                dhdl_tmp = self.bound_state_dhdl[i]
-
-            else:
-
-                dhdl_tmp = self.bound_state_dhdl
-
-            bound_work_values += self.integrate_work_files(
-                file_names=dhdl_tmp,
-                creation=False,
-                md_program=self.md_program)
-
-        #will become a numpy array
-        unbound_work_values = 0.
-        for i in range(number_of_unbound_subruns):
-
-            if number_of_unbound_subruns > 1:
-
-                dhdl_tmp = self.unbound_state_dhdl[i]
-
-            else:
-
-                dhdl_tmp = self.unbound_state_dhdl
-
-            unbound_work_values += self.integrate_work_files(
-                file_names=dhdl_tmp, creation=True, md_program=self.md_program)
-
-        #purge outliers
         z_score = 3.0
 
-        bound_work_values = purge_outliers.purge_outliers_zscore(
-            bound_work_values, z_score=z_score)
+        #numpy array
+        bound_work_values = self.get_purged_work_values(
+            self.bound_state_dhdl,
+            md_program=self.md_program,
+            creation=False,
+            z_score=z_score)
 
-        unbound_work_values = purge_outliers.purge_outliers_zscore(
-            unbound_work_values, z_score=z_score)
+        #numpy array
+        unbound_work_values = self.get_purged_work_values(
+            self.unbound_state_dhdl,
+            md_program=self.md_program,
+            creation=True,
+            z_score=z_score)
 
         # print a backup to file
         np.savetxt('bound_work_values.dat',
@@ -751,8 +742,8 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
             temperature=self.temperature)
 
         #make a backup of the combined work values
-        combined_work_values = (combine_works.combine_non_correlated_works(
-            bound_work_values, unbound_work_values))
+        combined_work_values = combine_works.combine_non_correlated_works(
+            bound_work_values, unbound_work_values)
 
         del bound_work_values
         del unbound_work_values
