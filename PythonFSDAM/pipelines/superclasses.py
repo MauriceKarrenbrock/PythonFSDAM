@@ -85,8 +85,7 @@ class FreeEnergyMixInSuperclass(object):
 
     useful for abstract pipeline superclasses
     """
-    @staticmethod
-    def calculate_free_energy(works, temperature):
+    def calculate_free_energy(self, works, temperature):
         """calculate the Jarzynski free energy
 
         Parameters
@@ -141,8 +140,7 @@ class FreeEnergyMixInSuperclass(object):
             raise NotImplementedError(
                 'Need to define this abstract method') from None
 
-    @staticmethod
-    def calculate_standard_deviation(works, temperature):
+    def calculate_standard_deviation(self, works, temperature):
         """calculates STD of the free energy with bootstrapping
 
         it is a wrapper of `PythonFSDAM.free_energy_calculations.plain_jarzynski_error_propagation`
@@ -158,8 +156,8 @@ class FreeEnergyMixInSuperclass(object):
             raise NotImplementedError(
                 'Need to define this abstract method') from None
 
-    @staticmethod
-    def vdssb_calculate_standard_deviation(works_1, works_2, temperature):
+    def vdssb_calculate_standard_deviation(self, works_1, works_2,
+                                           temperature):
         """calculates STD of the free energy with bootstrapping vDSSB
 
         it is a wrapper of `PythonFSDAM.free_energy_calculations.vDSSB_jarzynski_error_propagation`
