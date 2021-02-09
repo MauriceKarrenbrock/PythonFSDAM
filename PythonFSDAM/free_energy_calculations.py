@@ -539,3 +539,51 @@ def VDSSB_gaussian_mixtures_error_propagation(works_1,
         num_iterations=num_iterations)
 
     return out_std, out_mean
+
+
+def plain_gaussian_mixtures_error_propagation(works,
+                                              *,
+                                              temperature=298.15,
+                                              boltzmann_kappa=0.001985875,
+                                              num_iterations=10000,
+                                              n_gaussians=3,
+                                              tol=1.E-6,
+                                              max_iterations=None):
+    """gaussian mixstures STD via bootstrap
+
+    it doesn't use the vDSSB aproach, but only the normal
+    one, for the rest it is 100% equal to `vDSSB_gaussian_mixtures_error_propagation`
+
+    Parameters
+    -------------
+    works : numpy.array
+        the work values
+    temperature : float, optional
+        the temperature in Kelvin at which the non equilibrium simulation
+        has been done, default 298.15 K
+    boltzmann_kappa : float
+        the Boltzmann constant, the dafault is 0.001985875 kcal/(mol⋅K)
+        and if you keep it the `works` shall be in Kcal
+    num_iterations : ins, optional, default=10000
+        the number of bootstrapping iterations (time and memory consuming)
+    n_gaussians
+        check `gaussian_mixtures_free_energy`
+    tol
+        check `gaussian_mixtures_free_energy`
+    max_iterations
+        check `gaussian_mixtures_free_energy`
+    """
+
+    helper_obj = _vDSSBGaussianMixturesErrorPropagationHelperClass(
+        temperature=temperature,
+        boltzmann_kappa=boltzmann_kappa,
+        n_gaussians=n_gaussians,
+        tol=tol,
+        max_iterations=max_iterations)
+
+    out_mean, out_std = boot.bootstrap_std_of_function_results(
+        works,
+        function=helper_obj.calculate_gaussian_mixtures,
+        num_iterations=num_iterations)
+
+    return out_std, out_mean

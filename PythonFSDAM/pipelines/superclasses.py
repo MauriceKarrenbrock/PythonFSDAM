@@ -262,8 +262,6 @@ class GaussianMixtureFreeEnergyMixIn(FreeEnergyMixInSuperclass):
     """MixIn for gaussian mixtures free energy calcutations
 
     for both vDSSB and standard
-
-    TODO standard gaussian mixtures
     """
     def _write_gaussians(self, gaussians, log_likelyhood):
         """private"""
@@ -282,8 +280,7 @@ class GaussianMixtureFreeEnergyMixIn(FreeEnergyMixInSuperclass):
 
         _write.write_file(lines, f'{str(self)}_gaussians.csv')
 
-    @staticmethod
-    def calculate_free_energy(works, temperature):
+    def calculate_free_energy(self, works, temperature):
         """calculate the gaussian mixtures free energy
 
         Parameters
@@ -299,7 +296,13 @@ class GaussianMixtureFreeEnergyMixIn(FreeEnergyMixInSuperclass):
             Kcal/mol
         """
 
-        raise NotImplementedError
+        energy, gaussians, log_likelyhood = free_energy_calculations.gaussian_mixtures_free_energy(
+            works, temperature)
+
+        #in order to be able to check the quality of the fit
+        self._write_gaussians(gaussians, log_likelyhood)
+
+        return energy
 
     def vdssb_calculate_free_energy(self, works_1, works_2, temperature):
         """calculate the gaussian mixtures free energy vDSSB
@@ -321,11 +324,7 @@ class GaussianMixtureFreeEnergyMixIn(FreeEnergyMixInSuperclass):
 
         works = combine_works.combine_non_correlated_works(works_1, works_2)
 
-        energy, gaussians, log_likelyhood = free_energy_calculations.gaussian_mixtures_free_energy(
-            works, temperature)
-
-        #in order to be able to check the quality of the fit
-        self._write_gaussians(gaussians, log_likelyhood)
+        energy = self.calculate_free_energy(works, temperature)
 
         return energy
 
@@ -333,10 +332,14 @@ class GaussianMixtureFreeEnergyMixIn(FreeEnergyMixInSuperclass):
     def calculate_standard_deviation(works, temperature):
         """calculates STD of the free energy with bootstrapping
 
-        it is a wrapper of `PythonFSDAM.free_energy_calculations.TODO`
+        it is a wrapper of
+        `PythonFSDAM.free_energy_calculations.plain_gaussian_mixtures_error_propagation`
         """
 
-        raise NotImplementedError
+        STD, _ = free_energy_calculations.plain_gaussian_mixtures_error_propagation(
+            works, temperature=temperature)
+
+        return STD
 
     @staticmethod
     def vdssb_calculate_standard_deviation(works_1, works_2, temperature):
@@ -808,8 +811,8 @@ class JarzynskiVDSSBPostProcessingPipeline(VDSSBPostProcessingPipeline,
         return 'vDSSB_jarzynski_pipeline'
 
 
-class GaussianMixturesVDSSBPostProcessingPipeline(  # pylint: disable=abstract-method #TODO
-        VDSSBPostProcessingPipeline, GaussianMixtureFreeEnergyMixIn):  # pylint: disable=abstract-method #TODO
+class GaussianMixturesVDSSBPostProcessingPipeline(
+        VDSSBPostProcessingPipeline, GaussianMixtureFreeEnergyMixIn):
     """subclass of `VDSSBPostProcessingPipeline` that calculates free energy with  gaussian mixtures
 
     The distances for this class must be in Angstrom and the energies will always be in

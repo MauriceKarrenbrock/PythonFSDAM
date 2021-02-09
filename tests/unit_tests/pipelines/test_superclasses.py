@@ -191,17 +191,22 @@ class TestGaussianMixtureFreeEnergyMixIn():
 
     def test_calculate_free_energy(self, mocker):
 
-        pass
-        # m_free = mocker.patch('PythonFSDAM.free_energy_calculations.jarzynski_free_energy',
-        # return_value=-1)
+        m_free = mocker.patch(
+            'PythonFSDAM.free_energy_calculations.gaussian_mixtures_free_energy',
+            return_value=(-1, -2, -3))
 
-        # tmp_class = _super.GaussianMixtureFreeEnergyMixIn()
+        m_write = mocker.patch.object(_super.GaussianMixtureFreeEnergyMixIn,
+                                      '_write_gaussians')
 
-        # output = tmp_class.calculate_free_energy(1, 2)
+        tmp_class = _super.GaussianMixtureFreeEnergyMixIn()
 
-        # assert output == -1
+        output = tmp_class.calculate_free_energy(1, 2)
 
-        # m_free.assert_called_once_with(1, 2)
+        assert output == -1
+
+        m_free.assert_called_once_with(1, 2)
+
+        m_write.assert_called_once_with(-2, -3)
 
     def test_vdssb_calculate_free_energy(self, mocker):
 
@@ -209,12 +214,9 @@ class TestGaussianMixtureFreeEnergyMixIn():
             'PythonFSDAM.combine_works.combine_non_correlated_works',
             return_value=55)
 
-        m_free = mocker.patch(
-            'PythonFSDAM.free_energy_calculations.gaussian_mixtures_free_energy',
-            return_value=(-1, -2, -3))
-
-        m_write = mocker.patch.object(_super.GaussianMixtureFreeEnergyMixIn,
-                                      '_write_gaussians')
+        m_free = mocker.patch.object(_super.GaussianMixtureFreeEnergyMixIn,
+                                     'calculate_free_energy',
+                                     return_value=-1)
 
         tmp_class = _super.GaussianMixtureFreeEnergyMixIn()
 
@@ -226,22 +228,19 @@ class TestGaussianMixtureFreeEnergyMixIn():
 
         m_free.assert_called_once_with(55, 3)
 
-        m_write.assert_called_once_with(-2, -3)
-
     def test_calculate_standard_deviation(self, mocker):
 
-        pass
-        # m_std = mocker.patch(
-        #     'PythonFSDAM.free_energy_calculations.plain_jarzynski_error_propagation',
-        #     return_value=(-1, -2))
+        m_std = mocker.patch(
+            'PythonFSDAM.free_energy_calculations.plain_gaussian_mixtures_error_propagation',
+            return_value=(-1, -2))
 
-        # tmp_class = _super.GaussianMixtureFreeEnergyMixIn()
+        tmp_class = _super.GaussianMixtureFreeEnergyMixIn()
 
-        # output = tmp_class.calculate_standard_deviation(1, 2)
+        output = tmp_class.calculate_standard_deviation(1, 2)
 
-        # assert output == -1
+        assert output == -1
 
-        # m_std.assert_called_once_with(1, temperature=2)
+        m_std.assert_called_once_with(1, temperature=2)
 
     def test_vdssb_calculate_standard_deviation(self, mocker):
 
