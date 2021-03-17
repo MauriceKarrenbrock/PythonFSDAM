@@ -102,14 +102,107 @@ class Testmix_and_bootstrap():
         m_mean = mocker.patch('numpy.mean', return_value=1.)
         m_std = mocker.patch('numpy.std', return_value=2.)
 
+        mocker.patch.dict('os.environ')
+
         out_mean, out_std = boot.mix_and_bootstrap(values_1,
                                                    values_2,
                                                    mixing_function=m_mixing,
                                                    stat_function=m_stat,
-                                                   num_iterations=1)
+                                                   num_iterations=1,
+                                                   n_threads=2)
 
         assert out_mean == 1.
         assert out_std == 2.
+
+        assert m_pool.call_args[0][0] == 2
+
+        m_stat.assert_not_called()
+
+        m_array.assert_called_once()
+
+        m_mean.assert_called_once()
+        m_std.assert_called_once()
+
+    def test_default_no_env_variable(self, mocker):
+
+        values_1 = np.array([1, 2, 3])
+
+        values_2 = np.array([4, 5, 6])
+
+        m_mixing = mock.MagicMock()
+        m_stat = mock.MagicMock()
+
+        m_pool = mocker.patch('multiprocessing.pool.Pool')
+
+        m_pool_enter = mock.MagicMock()
+
+        m_pool_enter.return_value.starmap_async.return_value.get.return_value = [
+            1., 2., 3.
+        ]
+
+        m_pool.return_value.__enter__.return_value = m_pool_enter
+
+        m_array = mocker.patch('numpy.array', return_value=1.)
+        m_mean = mocker.patch('numpy.mean', return_value=1.)
+        m_std = mocker.patch('numpy.std', return_value=2.)
+
+        mocker.patch.dict('os.environ', dict())
+
+        out_mean, out_std = boot.mix_and_bootstrap(values_1,
+                                                   values_2,
+                                                   mixing_function=m_mixing,
+                                                   stat_function=m_stat,
+                                                   num_iterations=1,
+                                                   n_threads=None)
+
+        assert out_mean == 1.
+        assert out_std == 2.
+
+        assert m_pool.call_args[0][0] is None
+
+        m_stat.assert_not_called()
+
+        m_array.assert_called_once()
+
+        m_mean.assert_called_once()
+        m_std.assert_called_once()
+
+    def test_default_with_OMP_NUM_THREADS_env_variable(self, mocker):
+
+        values_1 = np.array([1, 2, 3])
+
+        values_2 = np.array([4, 5, 6])
+
+        m_mixing = mock.MagicMock()
+        m_stat = mock.MagicMock()
+
+        m_pool = mocker.patch('multiprocessing.pool.Pool')
+
+        m_pool_enter = mock.MagicMock()
+
+        m_pool_enter.return_value.starmap_async.return_value.get.return_value = [
+            1., 2., 3.
+        ]
+
+        m_pool.return_value.__enter__.return_value = m_pool_enter
+
+        m_array = mocker.patch('numpy.array', return_value=1.)
+        m_mean = mocker.patch('numpy.mean', return_value=1.)
+        m_std = mocker.patch('numpy.std', return_value=2.)
+
+        mocker.patch.dict('os.environ', dict(OMP_NUM_THREADS='55'))
+
+        out_mean, out_std = boot.mix_and_bootstrap(values_1,
+                                                   values_2,
+                                                   mixing_function=m_mixing,
+                                                   stat_function=m_stat,
+                                                   num_iterations=1,
+                                                   n_threads=None)
+
+        assert out_mean == 1.
+        assert out_std == 2.
+
+        assert m_pool.call_args[0][0] == 55
 
         m_stat.assert_not_called()
 

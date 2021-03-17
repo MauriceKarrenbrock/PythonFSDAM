@@ -8,6 +8,7 @@
 """Contains functions that use bootstrapping methods
 """
 
+import os
 from multiprocessing import Pool
 
 import bootstrapped.bootstrap as bs
@@ -122,8 +123,10 @@ def mix_and_bootstrap(
         the number of bootstrapping iterations
     n_threads : int, optional, default None
         the number of parallel threads to use
-        if left None they will be detected automatically
-        by multiprocessing.Pool
+        if left None the function will first check for
+        the environment variable OMP_NUM_THREADS
+        if it is not defined the default of multiprocessing.Pool
+        will be used (= the total nuymber of CPUs on the machine)
 
     Returns
     ------------
@@ -133,11 +136,27 @@ def mix_and_bootstrap(
     Notes
     --------
     this function is can be memory intensive if heavilly parallelized
+
+    the fact that if nothing is given as input the function first looks
+    for OMP_NUM_THREADS instead of the total nuymber of CPUs on the machine
+    is because it can be a problem on HPC clusters (you cannot simply use all
+    resources of the access node to do some post processing)
     """
 
     if num_iterations < 1:
         raise ValueError(
             f'num_iterations can not be less than one, it is {num_iterations}')
+
+    if n_threads is None:
+
+        n_threads = os.environ.get('OMP_NUM_THREADS', None)
+
+        try:
+
+            n_threads = int(n_threads)
+
+        except TypeError:  #None cannot be casted to int
+            pass
 
     #make input for parallel section
     input_values = []

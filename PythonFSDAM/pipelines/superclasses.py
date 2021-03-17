@@ -539,6 +539,8 @@ class PostProcessingSuperclass(Pipeline, FreeEnergyMixInSuperclass,
         it a distance file obtained from the previous enhanced sampling run might be
         needed. If you leave it blank no volume correction will be done (can always do it
         later on your own)
+    temperature : float, default=298.15
+        the temperature of the MD runs in Kelvin
     md_program : str, default=gromacs
         the md program that created the output to post-process
         in some cases you can use a superclass directly by setting the right
