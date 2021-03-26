@@ -97,7 +97,7 @@ def integrate_work_profiles(lambda_work):
         the value of the integral of the work profile
     """
 
-    work_result = np.trapz(lambda_work[1, :], lambda_work[0, :])
+    work_result = np.trapz(lambda_work[1], lambda_work[0])
 
     return work_result
 
