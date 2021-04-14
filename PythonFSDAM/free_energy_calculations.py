@@ -15,7 +15,6 @@ import numpy as np
 import PythonFSDAM.bootstrapping as boot
 import PythonFSDAM.combine_works as combine
 import PythonFSDAM.exp_max_gaussmix as em
-import PythonFSDAM.work_probability as work_probability
 
 
 # pylint: disable=anomalous-backslash-in-string
@@ -146,6 +145,9 @@ def volume_correction(distance_values, temperature=298.15):
         IN ANGSTROM!
     temperature : float
         Kelvin
+    bin_width : float, optional, default=0.1
+        the with (more or less) that the probability histogram shall have
+        don't change it if you are not 100% sure of what you are doing
 
     Returns
     ---------
@@ -161,19 +163,12 @@ def volume_correction(distance_values, temperature=298.15):
     """
 
     #angstrom
-    standard_volume = 1661.
+    standard_volume = 1661.0
 
     #kcal/mol
-    R_gas = 1.9872036 * (10**-3)
+    R_gas = 1.9872036e-3
 
-    bin_width = 0.1
-
-    histogram = work_probability.make_probability_histogram(
-        distance_values, bin_width)
-
-    histogram = histogram[0]
-
-    STD = np.std(histogram)
+    STD = np.std(distance_values)
 
     site_volume = (4. / 3.) * math.pi * (2 * STD)**3
 

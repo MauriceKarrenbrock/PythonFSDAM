@@ -39,6 +39,6 @@ class Testvolume_correction():
         output = free.volume_correction(distance_values, temperature)
 
         #previously calculated, only needed to see if nothing changes in the future
-        expected = -0.3599254484862161
+        expected = -3.544695949996799
 
         assert output == expected

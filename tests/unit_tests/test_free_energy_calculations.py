@@ -57,12 +57,6 @@ class Testweighted_jarzynski_free_energy():
 class Testvolume_correction():
     def test_calls(self, mocker):
 
-        fake_hist_return = (np.array([0.5, 0.5]), np.array([0.1, 0.2]))
-
-        m_hist = mocker.patch(
-            'PythonFSDAM.work_probability.make_probability_histogram',
-            return_value=fake_hist_return)
-
         m_std = mocker.patch('numpy.std', return_value=1.)
 
         m_log = mocker.patch('math.log', return_value=1.)
@@ -73,9 +67,7 @@ class Testvolume_correction():
 
         free.volume_correction(dist_values)
 
-        m_hist.assert_called_once_with(dist_values, 0.1)
-
-        m_std.assert_called_once_with(fake_hist_return[0])
+        m_std.assert_called_once()
 
         m_log.assert_called_once()
 

@@ -16,6 +16,7 @@ class Testmake_probability_histogram():
     def test_works(self, mocker):
 
         m_max = mocker.patch('numpy.max', return_value=1.)
+        m_min = mocker.patch('numpy.min', return_value=0.)
         m_hist = mocker.patch('numpy.histogram', return_value='output')
         m_ceil = mocker.patch('math.ceil')
 
@@ -26,5 +27,6 @@ class Testmake_probability_histogram():
         assert output == 'output'
 
         m_max.assert_called_once()
+        m_min.assert_called_once()
         m_hist.assert_called_once()
         m_ceil.assert_called_once_with(10.)
