@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #############################################################
-# Copyright (c) 2020-2020 Maurice Karrenbrock               #
+# Copyright (c) 2020-2021 Maurice Karrenbrock               #
 #                                                           #
 # This software is open-source and is distributed under the #
 # BSD 3-Clause "New" or "Revised" License                   #
@@ -452,6 +452,10 @@ class PreProcessingPipeline(Pipeline):
                  structure_files=None,
                  temperature=298.15):
 
+        if isinstance(topology_files, str):
+            topology_files = pathlib.Path(topology_files)
+        if isinstance(topology_files, pathlib.Path):
+            topology_files = [topology_files]
         self.topology_files = topology_files
 
         self.md_program_path = md_program_path
