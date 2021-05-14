@@ -103,3 +103,7 @@ cookiecutter-pypackage-env/
 
 # local virtual environment
 ve
+
+#Jupyter notebook checkpoints
+.ipynb_checkpoints
+
