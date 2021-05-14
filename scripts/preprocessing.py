@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # pylint: disable=line-too-long
+# pylint: disable=duplicate-code
 #############################################################
 # Copyright (c) 2020-2021 Maurice Karrenbrock               #
 #                                                           #
@@ -24,32 +25,38 @@ from PythonFSDAM.free_energy_calculations import volume_correction
 from PythonFSDAM.pipelines.factories import PreProcessing
 
 parser = argparse.ArgumentParser(
-    description='his script will pre process everything needed to do '
-    'FSDAM with the wanted md program use --help for usage info')
+    description='This script will pre process everything needed to do '
+    'FSDAM with the wanted md program use --help for usage info',
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 #parser = argparse.ArgumentParser(description="This script creates the input for FS-DAM both for the boded and unbonded system. For Gromacs\n You must run this script in the HREM root directory")
 
 parser.add_argument('--md-program',
                     action='store',
+                    type=str,
                     default='gromacs',
                     help='The MD program to use')
 
 parser.add_argument('--md-program-path',
                     action='store',
+                    type=str,
                     default='gmx',
                     help='The absolute path to the chosen program executable')
 
 parser.add_argument(
     '--creation',
     action='store',
-    default=True,
-    choices=[True, False],
+    type=str,
+    default='yes',
+    choices=['yes', 'no'],
     help=
-    'If the alchemical transformation shall be an annihilation or a creation')
+    'If the alchemical transformation shall be an annihilation (no) or a creation (yes)'
+)
 
 parser.add_argument(
     '--number-of-frames-to-use',
     action='store',
+    type=int,
     default=200,
     help=
     'The number of alchemical transformations to do, a good default is 200 protein ligand and 400 ligand only, default=200'
@@ -58,6 +65,7 @@ parser.add_argument(
 parser.add_argument(
     '--kind-of-system',
     action='store',
+    type=str,
     default='only-ligand',
     choices=['only-ligand', 'solvated-ligand', 'protein-ligand'],
     help=
@@ -67,6 +75,7 @@ parser.add_argument(
 parser.add_argument(
     '--alchemical-region',
     action='store',
+    type=str,
     help=
     'The syntax depends on the MD program, in gromacs you shall write the residue name (resname) of what you want to create/annihilate'
 )
@@ -74,6 +83,7 @@ parser.add_argument(
 parser.add_argument(
     '--harmonic-kappa',
     action='store',
+    type=float,
     default=120,
     help=
     'the harmonic constant in case an harmonic restraint has to be introduced in (KJ/mol)/A**2'
@@ -82,6 +92,7 @@ parser.add_argument(
 parser.add_argument(
     '--structure-files-type',
     action='store',
+    type=str,
     default='pdb',
     choices=['pdb', 'gro'],
     help=
@@ -91,6 +102,7 @@ parser.add_argument(
 parser.add_argument(
     '--topology-file',
     action='store',
+    type=str,
     default='system.top',
     help=
     'the topology file of the system (es gromacs top file or openMM xml file)')
@@ -98,6 +110,7 @@ parser.add_argument(
 parser.add_argument(
     '--water-box',
     action='store',
+    type=str,
     default=None,
     help=
     'in case --kinf-of-system is only-ligand you must give the structure file (pdb, gro, ...) of the needed water box (must be equilibrated)'
@@ -105,12 +118,14 @@ parser.add_argument(
 
 parser.add_argument('--temperature',
                     action='store',
+                    type=float,
                     default=298.15,
                     help='temperature in Kelvin (K)')
 
 parser.add_argument(
     '--protein-select-tring',
     action='store',
+    type=str,
     default='protein',
     help=
     'a mdtraj select string that identifies the protein, it is useful when protein (default) does not behave as expected'
@@ -119,6 +134,7 @@ parser.add_argument(
 parser.add_argument(
     '--add-dummy-atom',
     action='store',
+    type=str,
     default='no',
     choices=['yes', 'no'],
     help=
@@ -126,6 +142,14 @@ parser.add_argument(
 )
 
 parsed_input = parser.parse_args()
+
+if parsed_input.creation == 'yes':
+
+    parsed_input.creation = True
+
+else:
+
+    parsed_input.creation = False
 
 # get the structure files
 input_files = parsed_input.structure_files_type
@@ -139,11 +163,18 @@ not_used_dir.mkdir(parents=True, exist_ok=True)
 #randomly shuffle the structure files
 random.shuffle(input_files)
 
+files_for_vol_correction = []
 for i in range(len(input_files) - int(parsed_input.number_of_frames_to_use)):
 
-    shutil.move(str(input_files.pop(-1)),
-                str(not_used_dir),
-                copy_function=shutil.copy)
+    tmp_file = shutil.move(str(input_files.pop(-1)),
+                           str(not_used_dir),
+                           copy_function=shutil.copy)
+
+    files_for_vol_correction.append(str(tmp_file))
+
+for i in input_files:
+
+    files_for_vol_correction.append(str(i))
 
 COM_pull_groups = None
 
@@ -156,8 +187,6 @@ if parsed_input.kind_of_system == 'protein-ligand':
     harmonic_kappa = [[
         'Protein', parsed_input.alchemical_region, parsed_input.harmonic_kappa
     ]]
-
-    tmp_select = parsed_input.alchemical_region
 
     if parsed_input.add_dummy_atom == 'yes':
         #gromacs doesn't deal well with PBC when there are restraints
@@ -175,9 +204,15 @@ if parsed_input.kind_of_system == 'protein-ligand':
         harmonic_kappa.append(['DUM', 'Protein', 120])
         harmonic_kappa.append(['DUM', parsed_input.alchemical_region, 0])
 
+    if parsed_input.md_program == 'gromacs':
+
         tmp_select = f'resname {parsed_input.alchemical_region}'
 
-if parsed_input.kind_of_system == 'only-ligand':
+    else:
+
+        tmp_select = parsed_input.alchemical_region
+
+elif parsed_input.kind_of_system == 'only-ligand':
 
     water = mdtraj.load(str(parsed_input.water_box))
     water.center_coordinates()
@@ -195,6 +230,11 @@ if parsed_input.kind_of_system == 'only-ligand':
 
         joined.save(str(i), force_overwrite=True)
 
+# volume correction has no sens if the system is not protein-ligand
+# and this list can be thousands of strings long
+if parsed_input.kind_of_system != 'protein-ligand':
+    del files_for_vol_correction
+
 pipeline_obj = PreProcessing(md_program=parsed_input.md_program,
                              topology_files=parsed_input.topology_file,
                              md_program_path=parsed_input.md_program_path,
@@ -208,6 +248,8 @@ pipeline_obj = PreProcessing(md_program=parsed_input.md_program,
                              creation=parsed_input.creation)
 
 output = pipeline_obj.execute()
+
+del input_files
 
 if parsed_input.md_program == 'gromacs':
     with open('MAKE_VDW_TPR.sh', 'w') as f:
@@ -255,19 +297,23 @@ if parsed_input.md_program == 'gromacs':
 if parsed_input.kind_of_system == 'protein-ligand':
 
     print(
+        '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
         '\n\n\nI am calculating the volume correction, it will take a while\n'
         'But all the needed files to run the MD simulations are ready therefore you can go on on '
         'a different terminal window\n'
-        'In the end com_com_dist_Angstrom.dat and volume_correction.dat file will be created'
+        'In the end com_com_dist_Angstrom.dat and volume_correction.dat file will be created\n\n\n\n'
+        '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
     )
 
-    str_input_files = [str(i) for i in input_files]
-    traj = mdtraj.load(str_input_files, top=str_input_files[0])
+    traj = mdtraj.load(files_for_vol_correction,
+                       top=files_for_vol_correction[0])
+
+    del files_for_vol_correction
 
     dist = mdtraj.geometry.distance.compute_center_of_mass(
         traj,
         select=tmp_select) - mdtraj.geometry.distance.compute_center_of_mass(
-            traj, select='protein')
+            traj, select=parsed_input.protein_select_tring)
 
     dist = dist**2
 
