@@ -335,6 +335,6 @@ if parsed_input.kind_of_system == 'protein-ligand':
 
     with open('volume_correction.dat', 'w') as f:
 
-        f.write('#volume correction in Kcal/mol\n' 'f{vol_correction:.18e}\n')
+        f.write('#volume correction in Kcal/mol\n' f'{vol_correction:.18e}\n')
 
 print('Done')
