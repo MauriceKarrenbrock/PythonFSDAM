@@ -9,12 +9,31 @@
 
 import mdtraj
 import numpy as np
+from scipy.spatial import ConvexHull  # pylint: disable=no-name-in-module
+
+
+def _in_ellipsoid(X, center, rotation_matrix, radii):
+    """private"""
+    X = X.copy()
+    X -= center
+
+    X = rotation_matrix @ X
+
+    x = X[0]
+    y = X[1]
+    z = X[2]
+
+    result = (x / radii[0])**2 + (y / radii[1])**2 + (z / radii[2])**2
+
+    if result >= -1 and result <= 1:  # pylint: disable=chained-comparison
+        return True
+    return False
 
 
 def check_ligand_in_pocket(ligand,
                            pocket,
                            pdb_file,
-                           tollerance=0,
+                           n_atoms_inside=1,
                            top=None,
                            make_molecules_whole=False):
     """Check if the ligand is in the pocket
@@ -32,8 +51,10 @@ def check_ligand_in_pocket(ligand,
         a mdtraj selection string or a list of atom indexes (0 indexed)
     pdb_file : str or path or list(str or path)
         the path to any structure file supported by mdtraj.load (pdb, gro, ...)
-    tollerance : float, optional, default=0
-        how much a ligand atom can exit the pocket in Angtrom
+    n_atoms_inside : int, optional, default=1
+        how many atoms of the ligand shall be inside the pocket to be considered
+        in the pocket. With the default 1 if at leas one atom of the ligand is in the defined pocket
+        the ligand is considered inside
     top : str or path, optional
         this is the top keywor argument in mdtraj.load
         it is only needed if the structure file `pdb_file`
@@ -46,12 +67,10 @@ def check_ligand_in_pocket(ligand,
     Notes
     ----------
     This function uses mdtraj to parse the files
-    This implementation should work well for small ligands
-    that are not too flexible. I don't know how well it may
-    perform on more complex systems.
-    What it does is checking if at leas one atom of the ligand
-    is still in the pocket defined as input, with tollerance `tollerance`
-    in Angstrom
+    Then creates a hollow hull with ```scipy.spatial.ConvexHull```
+    Then fits is with an arbitrary ellipsoid
+    If at least `n_atoms_inside` atoms are inside the ellipsoid
+    the ligand is still in the pocket
 
     Returns
     -----------
@@ -61,14 +80,12 @@ def check_ligand_in_pocket(ligand,
         If you gave a list of structures as input you
         it will return a list of bool
     """
+
     if isinstance(pdb_file, str) or not hasattr(pdb_file, '__iter__'):
         pdb_file = [pdb_file]
 
     #mdtraj can't manage Path objects
     pdb_file = [str(i) for i in pdb_file]
-
-    #angstrom to nm
-    tollerance /= 10
 
     if top is None:
         # For a more omogeneus mdtraj.load function call
@@ -98,22 +115,61 @@ def check_ligand_in_pocket(ligand,
     is_in_pocket = []
 
     for ligand_frame, pocket_frame in zip(ligand_coord, pocket_coord):
-        tmp_in_pocket = True
+        atoms_in_pocket = 0
 
-        # [min_x, min_y, min_z] and [max_x, max_y, max_z]
-        pocket_min = np.amin(pocket_frame, axis=0) - tollerance
-        pocket_max = np.amax(pocket_frame, axis=0) + tollerance
+        convex_hull = ConvexHull(pocket_frame)
+        convex_hull = convex_hull.points[convex_hull.vertices]
 
-        for i in range(3):
-            # If any ligand atom is outside the [min, max] intervall
-            # The ligand is not in the pocket
-            if np.all(np.less(ligand_frame[i, :], pocket_min[i])):
-                tmp_in_pocket = False
-            if np.all(np.greater(ligand_frame[i, :], pocket_max[i])):
-                tmp_in_pocket = False
+        center, rotation_matrix, radii, _ = ellipsoid_fit(convex_hull)
 
-        is_in_pocket.append(tmp_in_pocket)
+        for atom in ligand_frame:
+            if _in_ellipsoid(atom, center, rotation_matrix, radii):
+                atoms_in_pocket += 1
+
+        if atoms_in_pocket < n_atoms_inside:
+            is_in_pocket.append(False)
+        else:
+            is_in_pocket.append(True)
 
     if len(is_in_pocket) == 1:
         return is_in_pocket[0]
     return is_in_pocket
+
+
+# https://github.com/aleksandrbazhin/ellipsoid_fit_python/blob/master/ellipsoid_fit.py
+# http://www.mathworks.com/matlabcentral/fileexchange/24693-ellipsoid-fit
+# for arbitrary axes
+# (Under MIT license)
+def ellipsoid_fit(X):
+    """fits an arbitrary ellipsoid to a set of points
+    """
+    x = X[:, 0]
+    y = X[:, 1]
+    z = X[:, 2]
+    D = np.array([
+        x * x + y * y - 2 * z * z, x * x + z * z - 2 * y * y, 2 * x * y,
+        2 * x * z, 2 * y * z, 2 * x, 2 * y, 2 * z, 1 - 0 * x
+    ])
+    d2 = np.array(x * x + y * y + z * z).T  # rhs for LLSQ
+    u = np.linalg.solve(D.dot(D.T), D.dot(d2))
+    a = np.array([u[0] + 1 * u[1] - 1])
+    b = np.array([u[0] - 2 * u[1] - 1])
+    c = np.array([u[1] - 2 * u[0] - 1])
+    v = np.concatenate([a, b, c, u[2:]], axis=0).flatten()
+    A = np.array([[v[0], v[3], v[4], v[6]], [v[3], v[1], v[5], v[7]],
+                  [v[4], v[5], v[2], v[8]], [v[6], v[7], v[8], v[9]]])
+
+    center = np.linalg.solve(-A[:3, :3], v[6:9])
+
+    translation_matrix = np.eye(4)
+    translation_matrix[3, :3] = center.T
+
+    R = translation_matrix.dot(A).dot(translation_matrix.T)
+
+    evals, evecs = np.linalg.eig(R[:3, :3] / -R[3, 3])
+    evecs = evecs.T
+
+    radii = np.sqrt(1. / np.abs(evals))
+    radii *= np.sign(evals)
+
+    return center, evecs, radii, v
