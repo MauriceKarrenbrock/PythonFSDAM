@@ -30,6 +30,97 @@ def _in_ellipsoid(X, center, rotation_matrix, radii):
     return False
 
 
+def get_atoms_in_pocket(ligand,
+                        pocket,
+                        pdb_file,
+                        top=None,
+                        make_molecules_whole=False):
+    """Get the number of ligand atoms in the given pocket
+
+    Parameters
+    -----------
+    ligand : str or list(int)
+        a mdtraj selection string or a list of atom indexes (0 indexed)
+    pocket : str or list(int)
+        a mdtraj selection string or a list of atom indexes (0 indexed)
+    pdb_file : str or path or list(str or path)
+        the path to any structure file supported by mdtraj.load (pdb, gro, ...)
+    top : str or path, optional
+        this is the top keywor argument in mdtraj.load
+        it is only needed if the structure file `pdb_file`
+        doesn't contain topology information
+    make_molecules_whole : bool, optional, default=False
+        if True make_molecules_whole() method will be called on the
+        mdtraj trajectory, I suggest not to use this option and to
+        give whole molecules as input
+
+    Notes
+    ----------
+    This function uses mdtraj to parse the files
+    Then creates a hollow hull with ```scipy.spatial.ConvexHull```
+    Then fits is with an arbitrary ellipsoid
+    If at least `n_atoms_inside` atoms are inside the ellipsoid
+    the ligand is still in the pocket
+
+    Returns
+    -----------
+    int or list(int)
+        the number of atoms in the pocket
+        if more than a frame was given it will be a list
+    """
+
+    if isinstance(pdb_file, str) or not hasattr(pdb_file, '__iter__'):
+        pdb_file = [pdb_file]
+
+    #mdtraj can't manage Path objects
+    pdb_file = [str(i) for i in pdb_file]
+
+    if top is None:
+        # For a more omogeneus mdtraj.load function call
+        top = pdb_file[0]
+    else:
+        top = str(top)
+    traj = mdtraj.load(pdb_file, top=top)
+
+    #want only positive coordinates
+
+    if make_molecules_whole:
+        traj.make_molecules_whole(inplace=True)
+
+    if isinstance(ligand, str):
+        ligand = traj.top.select(ligand)
+    if isinstance(pocket, str):
+        pocket = traj.top.select(pocket)
+
+    ligand_coord = traj.atom_slice(ligand).xyz
+    pocket_coord = traj.atom_slice(pocket).xyz
+
+    #free memory
+    del traj
+    del ligand
+    del pocket
+
+    atoms_in_pocket_list = []
+
+    for ligand_frame, pocket_frame in zip(ligand_coord, pocket_coord):
+        atoms_in_pocket = 0
+
+        convex_hull = ConvexHull(pocket_frame)
+        convex_hull = convex_hull.points[convex_hull.vertices]
+
+        center, rotation_matrix, radii, _ = ellipsoid_fit(convex_hull)
+
+        for atom in ligand_frame:
+            if _in_ellipsoid(atom, center, rotation_matrix, radii):
+                atoms_in_pocket += 1
+
+        atoms_in_pocket_list.append(atoms_in_pocket)
+
+    if len(atoms_in_pocket_list) == 1:
+        return atoms_in_pocket_list[0]
+    return atoms_in_pocket_list
+
+
 def check_ligand_in_pocket(ligand,
                            pocket,
                            pdb_file,
@@ -81,51 +172,19 @@ def check_ligand_in_pocket(ligand,
         it will return a list of bool
     """
 
-    if isinstance(pdb_file, str) or not hasattr(pdb_file, '__iter__'):
-        pdb_file = [pdb_file]
+    atoms_in_pocket_list = get_atoms_in_pocket(
+        ligand=ligand,
+        pocket=pocket,
+        pdb_file=pdb_file,
+        top=top,
+        make_molecules_whole=make_molecules_whole)
 
-    #mdtraj can't manage Path objects
-    pdb_file = [str(i) for i in pdb_file]
-
-    if top is None:
-        # For a more omogeneus mdtraj.load function call
-        top = pdb_file[0]
-    else:
-        top = str(top)
-    traj = mdtraj.load(pdb_file, top=top)
-
-    #want only positive coordinates
-
-    if make_molecules_whole:
-        traj.make_molecules_whole(inplace=True)
-
-    if isinstance(ligand, str):
-        ligand = traj.top.select(ligand)
-    if isinstance(pocket, str):
-        pocket = traj.top.select(pocket)
-
-    ligand_coord = traj.atom_slice(ligand).xyz
-    pocket_coord = traj.atom_slice(pocket).xyz
-
-    #free memory
-    del traj
-    del ligand
-    del pocket
+    if not hasattr(atoms_in_pocket_list, '__iter__'):
+        atoms_in_pocket_list = [atoms_in_pocket_list]
 
     is_in_pocket = []
 
-    for ligand_frame, pocket_frame in zip(ligand_coord, pocket_coord):
-        atoms_in_pocket = 0
-
-        convex_hull = ConvexHull(pocket_frame)
-        convex_hull = convex_hull.points[convex_hull.vertices]
-
-        center, rotation_matrix, radii, _ = ellipsoid_fit(convex_hull)
-
-        for atom in ligand_frame:
-            if _in_ellipsoid(atom, center, rotation_matrix, radii):
-                atoms_in_pocket += 1
-
+    for atoms_in_pocket in atoms_in_pocket_list:
         if atoms_in_pocket < n_atoms_inside:
             is_in_pocket.append(False)
         else:
