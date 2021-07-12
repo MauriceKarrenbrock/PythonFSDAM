@@ -43,8 +43,9 @@ def get_atoms_in_pocket(ligand,
         a mdtraj selection string or a list of atom indexes (0 indexed)
     pocket : str or list(int)
         a mdtraj selection string or a list of atom indexes (0 indexed)
-    pdb_file : str or path or list(str or path)
+    pdb_file : str or path or list(str or path) or mdtraj.Trajectory
         the path to any structure file supported by mdtraj.load (pdb, gro, ...)
+        or a mdtraj.Trajectory
     top : str or path, optional
         this is the top keywor argument in mdtraj.load
         it is only needed if the structure file `pdb_file`
@@ -69,18 +70,21 @@ def get_atoms_in_pocket(ligand,
         if more than a frame was given it will be a list
     """
 
-    if isinstance(pdb_file, str) or not hasattr(pdb_file, '__iter__'):
-        pdb_file = [pdb_file]
-
-    #mdtraj can't manage Path objects
-    pdb_file = [str(i) for i in pdb_file]
-
-    if top is None:
-        # For a more omogeneus mdtraj.load function call
-        top = pdb_file[0]
+    if isinstance(pdb_file, mdtraj.Trajectory):
+        traj = pdb_file
     else:
-        top = str(top)
-    traj = mdtraj.load(pdb_file, top=top)
+        if isinstance(pdb_file, str) or not hasattr(pdb_file, '__iter__'):
+            pdb_file = [pdb_file]
+
+        #mdtraj can't manage Path objects
+        pdb_file = [str(i) for i in pdb_file]
+
+        if top is None:
+            # For a more omogeneus mdtraj.load function call
+            top = pdb_file[0]
+        else:
+            top = str(top)
+        traj = mdtraj.load(pdb_file, top=top)
 
     #want only positive coordinates
 
