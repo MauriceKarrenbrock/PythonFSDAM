@@ -109,8 +109,8 @@ def get_atoms_in_pocket(ligand,
     for ligand_frame, pocket_frame in zip(ligand_coord, pocket_coord):
         atoms_in_pocket = 0
 
-        convex_hull = ConvexHull(pocket_frame)
-        convex_hull = convex_hull.points[convex_hull.vertices]
+        convex_hull_obj = ConvexHull(pocket_frame)
+        convex_hull = convex_hull_obj.points[convex_hull_obj.vertices]
 
         center, rotation_matrix, radii, _ = ellipsoid_fit(convex_hull)
 
@@ -119,6 +119,11 @@ def get_atoms_in_pocket(ligand,
                 atoms_in_pocket += 1
 
         atoms_in_pocket_list.append(atoms_in_pocket)
+
+        # I have a memory leak I couldn't
+        # identify maybe this helps
+        del convex_hull
+        del convex_hull_obj
 
     if len(atoms_in_pocket_list) == 1:
         return atoms_in_pocket_list[0]
