@@ -185,7 +185,7 @@ class TestJarzynskiFreeEnergyMixIn():
 
         output = tmp_class.calculate_standard_deviation(1, 2)
 
-        assert output == -1
+        assert output == (-1, -2)
 
         m_std.assert_called_once_with(1, temperature=2)
 
@@ -199,7 +199,7 @@ class TestJarzynskiFreeEnergyMixIn():
 
         output = tmp_class.vdssb_calculate_standard_deviation(1, 2, 3)
 
-        assert output == -1
+        assert output == (-1, -2)
 
         m_std.assert_called_once_with(1, 2, temperature=3)
 
@@ -290,7 +290,7 @@ class TestGaussianMixtureFreeEnergyMixIn():
 
         output = tmp_class.calculate_standard_deviation(1, 2)
 
-        assert output == -1
+        assert output == (-1, -2)
 
         m_std.assert_called_once_with(1, temperature=2)
 
@@ -304,7 +304,7 @@ class TestGaussianMixtureFreeEnergyMixIn():
 
         output = tmp_class.vdssb_calculate_standard_deviation(1, 2, 3)
 
-        assert output == -1
+        assert output == (-1, -2)
 
         m_std.assert_called_once_with(1, 2, temperature=3)
 
@@ -337,17 +337,13 @@ class TestPostProcessingSuperclass():
                                            'get_purged_work_values',
                                            return_value=-1)
 
-        m_free = mocker.patch.object(_super.PostProcessingSuperclass,
-                                     'calculate_free_energy',
-                                     return_value=-2)
-
         m_vol = mocker.patch.object(_super.PostProcessingSuperclass,
                                     'volume_com_com_correction',
                                     return_value=-3)
 
         m_std = mocker.patch.object(_super.PostProcessingSuperclass,
                                     'calculate_standard_deviation',
-                                    return_value=-4)
+                                    return_value=(-4, -2))
 
         m_savetxt = mocker.patch('numpy.savetxt')
 
@@ -370,8 +366,6 @@ class TestPostProcessingSuperclass():
                                              md_program='MD',
                                              creation=False,
                                              z_score=3.0)
-
-        m_free.assert_called_once_with(-1, temperature=1)
 
         m_vol.assert_called_once_with(distance_file='dist',
                                       temperature=1,

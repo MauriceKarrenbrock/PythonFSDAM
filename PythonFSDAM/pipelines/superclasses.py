@@ -289,10 +289,10 @@ class JarzynskiFreeEnergyMixIn(FreeEnergyMixInSuperclass):
         it is a wrapper of `PythonFSDAM.free_energy_calculations.plain_jarzynski_error_propagation`
         """
 
-        STD, _ = free_energy_calculations.plain_jarzynski_error_propagation(
+        STD, mean = free_energy_calculations.plain_jarzynski_error_propagation(
             works, temperature=temperature)
 
-        return STD
+        return STD, mean
 
     @staticmethod
     def vdssb_calculate_standard_deviation(works_1, works_2, temperature):
@@ -301,10 +301,10 @@ class JarzynskiFreeEnergyMixIn(FreeEnergyMixInSuperclass):
         it is a wrapper of `PythonFSDAM.free_energy_calculations.vDSSB_jarzynski_error_propagation`
         """
 
-        STD, _ = free_energy_calculations.vDSSB_jarzynski_error_propagation(
+        STD, mean = free_energy_calculations.vDSSB_jarzynski_error_propagation(
             works_1, works_2, temperature=temperature)
 
-        return STD
+        return STD, mean
 
 
 class GaussianMixtureFreeEnergyMixIn(FreeEnergyMixInSuperclass):
@@ -385,10 +385,10 @@ class GaussianMixtureFreeEnergyMixIn(FreeEnergyMixInSuperclass):
         `PythonFSDAM.free_energy_calculations.plain_gaussian_mixtures_error_propagation`
         """
 
-        STD, _ = free_energy_calculations.plain_gaussian_mixtures_error_propagation(
+        STD, mean = free_energy_calculations.plain_gaussian_mixtures_error_propagation(
             works, temperature=temperature)
 
-        return STD
+        return STD, mean
 
     @staticmethod
     def vdssb_calculate_standard_deviation(works_1, works_2, temperature):
@@ -398,10 +398,10 @@ class GaussianMixtureFreeEnergyMixIn(FreeEnergyMixInSuperclass):
         `PythonFSDAM.free_energy_calculations.VDSSB_gaussian_mixtures_error_propagation`
         """
 
-        STD, _ = free_energy_calculations.VDSSB_gaussian_mixtures_error_propagation(
+        STD, mean = free_energy_calculations.VDSSB_gaussian_mixtures_error_propagation(
             works_1, works_2, temperature=temperature)
 
-        return STD
+        return STD, mean
 
 
 ################################################
@@ -603,9 +603,6 @@ class PostProcessingSuperclass(Pipeline, FreeEnergyMixInSuperclass,
                    header=('work_values work values Kcal/mol '
                            f'(outliers with z score > {z_score} were purged)'))
 
-        self._free_energy_value += self.calculate_free_energy(
-            work_values, temperature=self.temperature)
-
         #volume correction
         if self.vol_correction_distances is not None:
 
@@ -616,8 +613,10 @@ class PostProcessingSuperclass(Pipeline, FreeEnergyMixInSuperclass,
                     temperature=self.temperature,
                     md_program=self.md_program)
 
-        STD = self.calculate_standard_deviation(work_values,
-                                                temperature=self.temperature)
+        STD, free_energy = self.calculate_standard_deviation(
+            work_values, temperature=self.temperature)
+
+        self._free_energy_value += free_energy
 
         # print the values of delta G and the confidence intervall (95%)
         lines = [
@@ -736,16 +735,13 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
                     f'(outliers with z score > {z_score} were purged)'))
 
         #get STD
-        STD = self.vdssb_calculate_standard_deviation(
+        STD, free_energy = self.vdssb_calculate_standard_deviation(
             bound_work_values,
             unbound_work_values,
             temperature=self.temperature)
 
         #get free energy
-        self._free_energy_value += self.vdssb_calculate_free_energy(
-            bound_work_values,
-            unbound_work_values,
-            temperature=self.temperature)
+        self._free_energy_value += free_energy
 
         #make a backup of the combined work values
         combined_work_values = combine_works.combine_non_correlated_works(
