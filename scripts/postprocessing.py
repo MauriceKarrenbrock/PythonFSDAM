@@ -21,8 +21,9 @@ from PythonFSDAM.pipelines import superclasses
 parser = argparse.ArgumentParser(
     description='This script will post process everything needed after '
     'FSDAM or vDSSB with the wanted md program use --help for usage info '
-    'Parallelism may be used, use OMP_NUM_THREADS environment variable to limit '
-    'the number of used GPUs',
+    'Parallelism by default it will use all the cores evailable, '
+    'use OMP_NUM_THREADS environment variable to limit '
+    'the number of used CPUs',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument('--md-program',
