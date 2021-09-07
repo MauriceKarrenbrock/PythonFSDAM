@@ -444,13 +444,16 @@ class PreProcessingPipeline(Pipeline):
         the `extract_from_trajectory` method must be called
         before `execute`
     temperature : float
+    constrains : str, default=all-bonds
+        possible values none, h-bonds, all-bonds
     """
     def __init__(self,
                  topology_files,
                  md_program_path,
                  alchemical_residue,
                  structure_files=None,
-                 temperature=298.15):
+                 temperature=298.15,
+                 constrains=None):
 
         if isinstance(topology_files, str):
             topology_files = pathlib.Path(topology_files)
@@ -465,6 +468,14 @@ class PreProcessingPipeline(Pipeline):
         self.structure_files = structure_files
 
         self.temperature = temperature
+
+        if constrains is None:
+            constrains = 'all-bonds'
+        if constrains not in ('none', 'h-bonds', 'all-bonds'):
+            raise ValueError(
+                f'constrains must be none, h-bonds, all-bonds not {constrains}'
+            )
+        self.constrains = constrains
 
         #For developers: this is should be a string that will be used to correctly
         #instantiate any kind of classes that are usually instantiated with a factory
