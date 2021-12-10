@@ -14,51 +14,10 @@ import pandas as pd
 import PythonFSDAM.parse.parse as _parse
 
 
-def get_work_profile_vs_lambda(lambda_work):
-    """Shows how the work value evolves in time (lambda is time dependent)
-
-    It's useful to plot during data analysis
-
-    Parameters
-    -----------
-    lambda_work : numpy.array
-        a 2-D array with 1 st line is lambda and the 2nd dH/dL
-        [
-            [lambda, lambda, lambda],
-            [dH/dL, dH/dL, dH/dL]
-        ]
-
-    Returns
-    ---------
-    np.array
-        an array with the same length of lambda that shows the time evolution of the work
-    """
-
-    output_work = np.empty(len(lambda_work[0]))
-
-    output_work[0] = 0.
-    output_work[1] = 0.
-
-    for i in range(2, len(lambda_work[0])):
-
-        output_work[i] = integrate_work_profiles(
-            [lambda_work[0][:i], lambda_work[1][:i]])
-
-    return output_work
-
-
-def integrate_multiple_work_files(work_files,
-                                  md_program='gromacs',
-                                  creation=True,
-                                  csv_name=None):
+def parse_multiple_work_files(work_files, md_program='gromacs', creation=True):
     """convenience function to parse and integrate many work files
 
-    this is a convenient and quick high level function, it depends on the
-    other functions and classes in this module and in the `parse` module
-
-    It also creates a csv file called creation_work_vs_lambda.csv or
-    creation_work_vs_lambda.csv (default)
-    that contains the time evolution of work along lambda (useful for plotting in post processing)
+    returns a generator
 
     Parameters
     -------------
@@ -72,14 +31,16 @@ def integrate_multiple_work_files(work_files,
         work values in function of time and not of lambda
         if creation=True the function will take for granted that
         lambda went linearly from 0 to 1, viceversa for creation=False
-    csv_name : str, default=creation_work_vs_lambda.csv or creation_work_vs_lambda.csv
-        a csv file called that contains the time evolution of work along lambda
-        (useful for plotting in post processing)
 
-    Returns
+    Resturns
     ------------
-    numpy.array
-        the values of the integrated works in the same order as in input
+    generator of lambda_work arrays : list(numpy.array)
+        a list of 2-D arrays with 1 st line is lambda and the 2nd dH/dL
+        [
+            [lambda, lambda, lambda],
+            [dH/dL, dH/dL, dH/dL]
+        ]
+        It has the same order as the input files
     """
 
     if creation:
@@ -94,11 +55,7 @@ def integrate_multiple_work_files(work_files,
 
     dhdl_parser = _parse.ParseWorkProfile(md_program)
 
-    work_integrator = WorkResults(len(work_files))
-
-    work_vs_lambda_profiles = pd.DataFrame()
-
-    for i, file_name in enumerate(work_files):
+    for file_name in work_files:
 
         #it is needed for some programs like gromacs
         #that don't print the values of lambda but print the time
@@ -115,20 +72,44 @@ def integrate_multiple_work_files(work_files,
 
             lambda_work_value = dhdl_parser.parse(file_name)
 
-        work_vs_lambda_profiles[f'w{i}'] = get_work_profile_vs_lambda(
-            lambda_work_value)
+        yield lambda_work_value
 
+
+def integrate_multiple_work_files(work_files,
+                                  md_program='gromacs',
+                                  creation=True):
+    """convenience function to parse and integrate many work files
+
+    this is a convenient and quick high level function, it depends on the
+    other functions and classes in this module and in the `parse` module
+
+    Parameters
+    -------------
+    work_files : iterable of str or path
+        the files containing the work values
+    md_program : str, default=gromacs
+        the md program that created the file, in order to know which parser to
+        use, check the `parse` module to see which ones are supported
+    creation : bool, optional, default=True
+        it is only used for the kind of md programs that print the
+        work values in function of time and not of lambda
+        if creation=True the function will take for granted that
+        lambda went linearly from 0 to 1, viceversa for creation=False
+
+    Returns
+    ------------
+    numpy.array
+        the values of the integrated works in the same order as in input
+    """
+
+    work_integrator = WorkResults(len(work_files))
+
+    lambda_work_generator = parse_multiple_work_files(work_files=work_files,
+                                                      md_program=md_program,
+                                                      creation=creation)
+
+    for lambda_work_value in lambda_work_generator:
         work_integrator.integrate_and_add(lambda_work_value)
-
-    work_vs_lambda_profiles.insert(0, 'lambda', lambda_work_value[0])
-
-    if csv_name is None:
-        if creation:
-            csv_name = 'creation_work_vs_lambda.csv'
-        else:
-            csv_name = 'annihilation_work_vs_lambda.csv'
-
-    work_vs_lambda_profiles.to_csv(csv_name, index=False)
 
     return work_integrator.get_work_values()
 
@@ -254,3 +235,131 @@ class WorkResults(object):
         """
 
         return self._works
+
+
+def get_work_profile_vs_lambda(lambda_work):
+    """Shows how the work value evolves along lambda
+
+    It's useful to plot during data analysis
+
+    Parameters
+    -----------
+    lambda_work : numpy.array
+        a 2-D array with 1 st line is lambda and the 2nd dH/dL
+        [
+            [lambda, lambda, lambda],
+            [dH/dL, dH/dL, dH/dL]
+        ]
+
+    Returns
+    ---------
+    np.array
+        an array with the same length of lambda that shows the time evolution of the work
+    """
+
+    output_work = np.empty(len(lambda_work[0]))
+
+    output_work[0] = 0.
+    output_work[1] = 0.
+
+    for i in range(2, len(lambda_work[0])):
+
+        output_work[i] = integrate_work_profiles(
+            [lambda_work[0][:i], lambda_work[1][:i]])
+
+    return output_work
+
+
+def make_work_vs_lambda_csv(work_files,
+                            md_program='gromacs',
+                            creation=True,
+                            csv_name=None,
+                            num_runs=None):
+    """Creates and writes a csv file that shows how the work value evolves along lambda
+
+    Parameters
+    -------------
+    work_files : iterable of str or path
+        the files containing the work values
+    md_program : str, default=gromacs
+        the md program that created the file, in order to know which parser to
+        use, check the `parse` module to see which ones are supported
+    creation : bool, optional, default=True
+        it is only used for the kind of md programs that print the
+        work values in function of time and not of lambda
+        if creation=True the function will take for granted that
+        lambda went linearly from 0 to 1, viceversa for creation=False
+    csv_name : str, optional, default=None
+        the name of the csv to create, if not given it will be
+        creation_work_vs_lambda.csv or creation_work_vs_lambda.csv
+        depending on the value of `creation`
+    num_runs : int, optional, deefault=None
+        if the alchemical transformation has been done in one run or 2 or 3, ...
+        if not given it will be guessed by the `md_program` (es gromacs is 2)
+
+    Returns
+    ---------
+    str
+        the name of the csv file
+    """
+
+    separated_q_vdw = ('gromacs')
+
+    if num_runs is not None:
+        pass
+    elif md_program in separated_q_vdw:
+        num_runs = 2
+    else:
+        num_runs = 1
+
+    # Make it a nested list to have a common function
+    if num_runs == 1:
+        work_files = [work_files]
+
+    df = pd.DataFrame(columns=['lambda'] +
+                      [f'w{i}' for i in range(len(work_files[0]))])
+
+    # This part is memory intensive
+    # will have to come up with something better
+    for files in work_files:
+        for n, work_lambda in enumerate(
+                parse_multiple_work_files(work_files=files,
+                                          md_program=md_program,
+                                          creation=creation)):
+
+            if df[f'w{n}'].values:
+                df[f'w{n}'] = np.concatenate([
+                    df[f'w{n}'].values,
+                    get_work_profile_vs_lambda(work_lambda) +
+                    df[f'w{n}'].values[-1]
+                ])
+            else:
+                df[f'w{n}'] = get_work_profile_vs_lambda(work_lambda)
+
+        if df['lambda'].values:
+            # lambda usually goes from 0 to 1 or 1 to 0
+            # if the process was done in more steps it will
+            # go from 0 to 2 or 1 to -1 (or similar)
+            if df['lambda'].values[
+                    -1] > 0.1:  # To avoid floating point errors, shoud be 0
+                work_lambda[0] += df['lambda'].values[-1]  # pylint: disable=undefined-loop-variable
+
+            else:
+                work_lambda[0] = (-work_lambda[0]) + df['lambda'].values[-1]  # pylint: disable=undefined-loop-variable
+
+            df['lambda'] = np.concatenate(
+                [df['lambda'].values, work_lambda[0]])  # pylint: disable=undefined-loop-variable
+
+        else:
+            df['lambda'] = work_lambda[0]  # pylint: disable=undefined-loop-variable
+
+    if csv_name is None:
+        if creation:
+            csv_name = 'creation_work_vs_lambda.csv'
+
+        else:
+            csv_name = 'annihilation_work_vs_lambda.csv'
+
+    df.to_csv(csv_name, index=False)
+
+    return csv_name
