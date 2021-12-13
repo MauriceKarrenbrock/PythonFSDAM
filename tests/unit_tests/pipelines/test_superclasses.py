@@ -389,7 +389,7 @@ class TestPostProcessingSuperclass():
             expected_lines, 'not_defined_pipeline_free_energy.dat')
 
 
-class VDSSBTestPostProcessingSuperclass():
+class TestVDSSBPostProcessingSuperclass():
     def test__init__(self):
 
         test_class = _super.VDSSBPostProcessingPipeline(
@@ -398,7 +398,7 @@ class VDSSBTestPostProcessingSuperclass():
             vol_correction_distances_bound_state=['bound_dist'],
             vol_correction_distances_unbound_state=['unbound_dist'],
             temperature=1,
-            md_program='MD')
+            md_program='gromacs')
 
         assert test_class.bound_state_dhdl == ['bound_files']
         assert test_class.unbound_state_dhdl == ['unbound_files']
@@ -409,7 +409,7 @@ class VDSSBTestPostProcessingSuperclass():
             'unbound_dist'
         ]
         assert test_class.temperature == 1
-        assert test_class.md_program == 'MD'
+        assert test_class.md_program == 'gromacs'
         assert test_class._free_energy_value == 0.
 
     def test_execute(self, mocker):
@@ -418,17 +418,13 @@ class VDSSBTestPostProcessingSuperclass():
                                            'get_purged_work_values',
                                            return_value=-1)
 
-        m_free = mocker.patch.object(_super.VDSSBPostProcessingPipeline,
-                                     'vdssb_calculate_free_energy',
-                                     return_value=-2)
-
         m_vol = mocker.patch.object(_super.VDSSBPostProcessingPipeline,
                                     'volume_com_com_correction',
                                     return_value=-3)
 
         m_std = mocker.patch.object(_super.VDSSBPostProcessingPipeline,
                                     'vdssb_calculate_standard_deviation',
-                                    return_value=-4)
+                                    return_value=(-5, -4))
 
         m_savetxt = mocker.patch('numpy.savetxt')
 
@@ -449,8 +445,8 @@ class VDSSBTestPostProcessingSuperclass():
 
         out_free, out_std = test_class.execute()
 
-        assert out_free == -5
-        assert out_std == -4
+        assert out_free == -4
+        assert out_std == -5
 
         calls = [
             mock.call(['bound_files'],
@@ -465,11 +461,9 @@ class VDSSBTestPostProcessingSuperclass():
 
         m_work_purge.assert_has_calls(calls)
 
-        m_free.assert_called_once_with(-1, temperature=1)
-
         m_vol.assert_not_called()
 
-        m_std.assert_called_once_with(-1, temperature=1)
+        m_std.assert_called_once_with(-1, -1, temperature=1)
 
         calls = [
             mock.call(

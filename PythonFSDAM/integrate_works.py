@@ -281,6 +281,7 @@ def make_work_vs_lambda_csv(work_files,
     -------------
     work_files : iterable of str or path
         the files containing the work values
+        if num_runs != 1 it has to be a nested list
     md_program : str, default=gromacs
         the md program that created the file, in order to know which parser to
         use, check the `parse` module to see which ones are supported
@@ -316,42 +317,48 @@ def make_work_vs_lambda_csv(work_files,
     if num_runs == 1:
         work_files = [work_files]
 
+    if num_runs != len(work_files):
+        raise ValueError(
+            f'The value of num_runs={num_runs} that you gave is incoherent with'
+            f' the lenght of work_files={len(work_files)}')
+
     df = pd.DataFrame(columns=['lambda'] +
                       [f'w{i}' for i in range(len(work_files[0]))])
 
     # This part is memory intensive
     # will have to come up with something better
-    for files in work_files:
-        for n, work_lambda in enumerate(
+    for run, files in enumerate(work_files):
+
+        tmp_df = pd.DataFrame(columns=df.columns)
+
+        for n, lambda_work in enumerate(
                 parse_multiple_work_files(work_files=files,
                                           md_program=md_program,
                                           creation=creation)):
 
-            if df[f'w{n}'].values:
-                df[f'w{n}'] = np.concatenate([
-                    df[f'w{n}'].values,
-                    get_work_profile_vs_lambda(work_lambda) +
-                    df[f'w{n}'].values[-1]
-                ])
-            else:
-                df[f'w{n}'] = get_work_profile_vs_lambda(work_lambda)
+            tmp_df[f'w{n}'] = get_work_profile_vs_lambda(lambda_work)
 
-        if df['lambda'].values:
+            if run != 0:
+                # The values have to take into consideration the previous integration
+                tmp_df[
+                    f'w{n}'] = tmp_df[f'w{n}'].values + df[f'w{n}'].values[-1]
+
+        tmp_df['lambda'] = lambda_work[0]  # pylint: disable=undefined-loop-variable
+
+        if run != 0:
             # lambda usually goes from 0 to 1 or 1 to 0
             # if the process was done in more steps it will
             # go from 0 to 2 or 1 to -1 (or similar)
             if df['lambda'].values[
                     -1] > 0.1:  # To avoid floating point errors, shoud be 0
-                work_lambda[0] += df['lambda'].values[-1]  # pylint: disable=undefined-loop-variable
+                tmp_df['lambda'] = tmp_df['lambda'].values + df[
+                    'lambda'].values[-1]
 
             else:
-                work_lambda[0] = (-work_lambda[0]) + df['lambda'].values[-1]  # pylint: disable=undefined-loop-variable
+                tmp_df['lambda'] = (
+                    -tmp_df['lambda'].values) + df['lambda'].values[-1]
 
-            df['lambda'] = np.concatenate(
-                [df['lambda'].values, work_lambda[0]])  # pylint: disable=undefined-loop-variable
-
-        else:
-            df['lambda'] = work_lambda[0]  # pylint: disable=undefined-loop-variable
+        df = df.append(tmp_df, ignore_index=True)
 
     if csv_name is None:
         if creation:

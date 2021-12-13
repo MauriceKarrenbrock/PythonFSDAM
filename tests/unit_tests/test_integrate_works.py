@@ -42,11 +42,6 @@ class Testintegrate_multiple_work_files():
 
         m_works.return_value.get_work_values.return_value = 1
 
-        m_work_vs_lambda = mocker.patch(
-            'PythonFSDAM.integrate_works.get_work_profile_vs_lambda')
-
-        m_pandas = mocker.patch('pandas.DataFrame')
-
         file_names = ['1', '2', '3']
 
         md_program = 'some_md_program'
@@ -69,10 +64,6 @@ class Testintegrate_multiple_work_files():
 
         m_works.return_value.get_work_values.assert_called_once()
 
-        m_work_vs_lambda.assert_called()
-
-        m_pandas.assert_called()
-
     def test_works_create_false(self, mocker):
 
         m_parser = mocker.patch('PythonFSDAM.parse.parse.ParseWorkProfile')
@@ -80,8 +71,6 @@ class Testintegrate_multiple_work_files():
         m_works = mocker.patch('PythonFSDAM.integrate_works.WorkResults')
 
         m_works.return_value.get_work_values.return_value = 1
-
-        mocker.patch('PythonFSDAM.integrate_works.get_work_profile_vs_lambda')
 
         mocker.patch('pandas.DataFrame')
 

@@ -637,10 +637,6 @@ class PostProcessingSuperclass(Pipeline, FreeEnergyMixInSuperclass,
         ]
         _write.write_file(lines, f'{str(self)}_free_energy.dat')
 
-        integrate_works.make_work_vs_lambda_csv(work_files=self.dhdl_files,
-                                                md_program=self.md_program,
-                                                creation=self.creation)
-
         return self._free_energy_value, STD
 
 
