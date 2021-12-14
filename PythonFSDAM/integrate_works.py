@@ -355,8 +355,8 @@ def make_work_vs_lambda_csv(work_files,
                     'lambda'].values[-1]
 
             else:
-                tmp_df['lambda'] = (
-                    -tmp_df['lambda'].values) + df['lambda'].values[-1]
+                tmp_df['lambda'] = tmp_df['lambda'].values - df[
+                    'lambda'].values[0]
 
         df = df.append(tmp_df, ignore_index=True)
 
