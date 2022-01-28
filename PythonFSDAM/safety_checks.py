@@ -135,7 +135,8 @@ def check_ligand_in_pocket(ligand,
                            pdb_file,
                            n_atoms_inside=1,
                            top=None,
-                           make_molecules_whole=False):
+                           make_molecules_whole=False,
+                           tollerance=0):
     """Check if the ligand is in the pocket
 
     If you used some kind of enhanced sampling before the FSDAM
@@ -163,14 +164,18 @@ def check_ligand_in_pocket(ligand,
         if True make_molecules_whole() method will be called on the
         mdtraj trajectory, I suggest not to use this option and to
         give whole molecules as input
+    tollerance : int, optional, default=0
+        the ligand will be considered inside if the number of atoms in
+        the pocket are `n_atoms_inside` +- `tollerance`
 
     Notes
     ----------
     This function uses mdtraj to parse the files
     Then creates a hollow hull with ```scipy.spatial.ConvexHull```
     Then fits is with an arbitrary ellipsoid
-    If at least `n_atoms_inside` atoms are inside the ellipsoid
-    the ligand is still in the pocket
+    If abs(`atoms_in_pocket` - `n_atoms_inside`) > tollerance,
+    with `atoms_in_pocket` is the number of atoms that are inside the ellipsoid
+    the ligand considered still in the pocket
 
     Returns
     -----------
@@ -194,7 +199,7 @@ def check_ligand_in_pocket(ligand,
     is_in_pocket = []
 
     for atoms_in_pocket in atoms_in_pocket_list:
-        if atoms_in_pocket < n_atoms_inside:
+        if abs(atoms_in_pocket - n_atoms_inside) > tollerance:
             is_in_pocket.append(False)
         else:
             is_in_pocket.append(True)
