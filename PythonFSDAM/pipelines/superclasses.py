@@ -845,3 +845,18 @@ class JarzynskiPostProcessingAlchemicalLeg(PostProcessingSuperclass,
     def __str__(self):
 
         return 'standard_jarzynski_pipeline'
+
+
+class GaussianMixturesPostProcessingAlchemicalLeg(
+        PostProcessingSuperclass, GaussianMixtureFreeEnergyMixIn):
+    """post processing class for plain jarzynski (no vDSSB)
+
+    this class post processes only a single alchemical leg (creation or annihilation)
+    note that this behaviour is very different from his vDSSB counterpart that
+    post processes everything together
+
+    see documentation for `PostProcessingSuperclass` and `GaussianMixtureFreeEnergyMixIn`
+    """
+    def __str__(self):
+
+        return 'standard_gaussian_mixtures_pipeline'
