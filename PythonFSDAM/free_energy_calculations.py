@@ -284,6 +284,40 @@ def plain_jarzynski_error_propagation(works,
     return out_std, out_mean
 
 
+def crooks_free_energy_for_gaussian_distributions(mean,
+                                                std,
+                                                temperature=298.15,
+                                                boltzmann_kappa=0.001985875):
+        """Unidirectional Crooks free energy for gaussian distributions
+
+        Parameters
+        -----------
+        mean : float
+            the mean of the gaussian distribution
+        std : float
+            the standard deviation of the gaussian distribution
+        temperature : float, optional
+            the temperature in Kelvin at which the non equilibrium simulation
+            has been done, default 298.15 K
+        boltzmann_kappa : float
+            the Boltzmann constant, the dafault is 0.001985875 kcal/(mol⋅K)
+            and if you keep it the `works` shall be in Kcal
+
+        Returns
+        ---------
+        float
+
+        Notes
+        ---------
+        The calculation done is mean - 0.5 * (std**2) * (1/kb*T)
+        """
+        kappa_T = boltzmann_kappa * temperature
+
+        beta = 1. / kappa_T
+
+        return mean - 0.5 * (std**2) * beta
+
+
 def gaussian_mixtures_free_energy(works,
                                   temperature=298.15,
                                   boltzmann_kappa=0.001985875,
@@ -356,9 +390,14 @@ def gaussian_mixtures_free_energy(works,
 
     def crooks_for_gaussian(mean, var):
         """helper function
-        """
 
-        return mean - 0.5 * (var**2) * beta
+        kept in order not to modify the rest of the function
+        when I extracted it from here
+        """
+        return crooks_free_energy_for_gaussian_distributions(mean=mean,
+                                                std=var,
+                                                temperature=temperature,
+                                                boltzmann_kappa=boltzmann_kappa)
 
     for i in range(n_gaussians):
 
