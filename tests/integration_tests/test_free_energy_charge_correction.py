@@ -9,10 +9,13 @@
 # BSD 3-Clause "New" or "Revised" License                   #
 #############################################################
 
+import pytest
+
 from PythonFSDAM import free_energy_charge_correction as charge_correction
 
 
 class Testglobular_protein_correction():
+
     def test_works(self, get_data_dir):
         input_file = get_data_dir / 'ligand_in_pocket.gro'
 
@@ -23,4 +26,6 @@ class Testglobular_protein_correction():
             ligand='resname LIG',
         )
 
-        assert output == -0.00011226578741158404  # a old result to check consistency
+        assert pytest.approx(
+            output
+        ) == -0.00011226578741158404  # a old result to check consistency

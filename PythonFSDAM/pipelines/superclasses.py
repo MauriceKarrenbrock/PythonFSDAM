@@ -13,6 +13,7 @@ import pathlib
 import numpy as np
 import PythonAuxiliaryFunctions.files_IO.write_file as _write
 import PythonPDBStructures.trajectories.extract_frames as extract_frames
+import scipy.stats
 
 import PythonFSDAM.combine_works as combine_works
 import PythonFSDAM.free_energy_calculations as free_energy_calculations
@@ -30,6 +31,7 @@ import PythonFSDAM.purge_outliers as purge_outliers
 class IntegrateWorksMixIn(object):
     """MixIn class to integrate work values and files
     """
+
     @staticmethod
     def integrate_work_files(file_names, md_program, creation):
         """integrate many work files
@@ -94,6 +96,7 @@ class IntegrateWorksMixIn(object):
 class FreeEnergyCorrectionsMixIn(object):
     """MixIn for volume, orientational, ... corrections to free energy
     """
+
     @staticmethod
     def volume_com_com_correction(distance_file, temperature, md_program):
         """make volume correction for COM-COM weak restraints (COM=center of mass)
@@ -134,6 +137,7 @@ class FreeEnergyMixInSuperclass(object):
 
     useful for abstract pipeline superclasses
     """
+
     def calculate_free_energy(self, works, temperature):
         """calculate the Jarzynski free energy
 
@@ -236,6 +240,7 @@ class JarzynskiFreeEnergyMixIn(FreeEnergyMixInSuperclass):
     ------------
     implements the abstract class `FreeEnergyMixInSuperclass`
     """
+
     @staticmethod
     def calculate_free_energy(works, temperature):
         """calculate the Jarzynski free energy
@@ -312,6 +317,7 @@ class GaussianMixtureFreeEnergyMixIn(FreeEnergyMixInSuperclass):
 
     for both vDSSB and standard
     """
+
     def _write_gaussians(self, gaussians, log_likelyhood):
         """private"""
 
@@ -417,6 +423,7 @@ class Pipeline(object):
     execute
         executes the pipeline
     """
+
     def execute(self):
         """Executes the pipeline, it is implemented by the subclasses
         """
@@ -447,6 +454,7 @@ class PreProcessingPipeline(Pipeline):
     constrains : str, default=all-bonds
         possible values none, h-bonds, all-bonds
     """
+
     def __init__(self,
                  topology_files,
                  md_program_path,
@@ -571,6 +579,7 @@ class PostProcessingSuperclass(Pipeline, FreeEnergyMixInSuperclass,
     execute()
         the only public method
     """
+
     def __init__(self,
                  dhdl_files,
                  vol_correction_distances=None,
@@ -609,10 +618,14 @@ class PostProcessingSuperclass(Pipeline, FreeEnergyMixInSuperclass,
                                                   creation=self.creation,
                                                   z_score=z_score)
 
-        np.savetxt('work_values.dat',
-                   work_values,
-                   header=('work_values work values Kcal/mol '
-                           f'(outliers with z score > {z_score} were purged)'))
+        np.savetxt(
+            'work_values.dat',
+            work_values,
+            header=
+            ('work_values work values Kcal/mol '
+             f'(outliers with z score > {z_score} were purged) '
+             f'ANDERSON_TEST_VALUE={scipy.stats.anderson(work_values).statistic}'
+             ))
 
         #volume correction
         if self.vol_correction_distances is not None:
@@ -679,6 +692,7 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
         in some cases you can use a superclass directly by setting the right
         `md_program` in other cases you will need to use some subclass
     """
+
     def __init__(self,
                  bound_state_dhdl,
                  unbound_state_dhdl,
@@ -734,16 +748,23 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
             z_score=z_score)
 
         # print a backup to file
-        np.savetxt('bound_work_values.dat',
-                   bound_work_values,
-                   header=('bound work values after z score purging Kcal/mol '
-                           f'(outliers with z score > {z_score} were purged)'))
+        np.savetxt(
+            'bound_work_values.dat',
+            bound_work_values,
+            header=
+            ('bound work values after z score purging Kcal/mol '
+             f'(outliers with z score > {z_score} were purged) '
+             f'ANDERSON_TEST_VALUE={scipy.stats.anderson(bound_work_values).statistic}'
+             ))
 
         np.savetxt(
             'unbound_work_values.dat',
             unbound_work_values,
-            header=('unbound work values after z score purging Kcal/mol '
-                    f'(outliers with z score > {z_score} were purged)'))
+            header=
+            ('unbound work values after z score purging Kcal/mol '
+             f'(outliers with z score > {z_score} were purged) '
+             f'ANDERSON_TEST_VALUE={scipy.stats.anderson(unbound_work_values).statistic}'
+             ))
 
         #get STD
         STD, free_energy = self.vdssb_calculate_standard_deviation(
@@ -762,9 +783,13 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
         del unbound_work_values
 
         # print a backup to file
-        np.savetxt('combined_work_values.dat',
-                   combined_work_values,
-                   header=('combined_work_values work values Kcal/mol'))
+        np.savetxt(
+            'combined_work_values.dat',
+            combined_work_values,
+            header=
+            ('combined_work_values work values Kcal/mol '
+             f'ANDERSON_TEST_VALUE={scipy.stats.anderson(combined_work_values).statistic}'
+             ))
 
         del combined_work_values
 
@@ -810,6 +835,7 @@ class JarzynskiVDSSBPostProcessingPipeline(VDSSBPostProcessingPipeline,
     This class elaborates bound and unbound state toghether, that is very different from
     the not vDSSB one
     """
+
     def __str__(self):
 
         return 'vDSSB_jarzynski_pipeline'
@@ -827,6 +853,7 @@ class GaussianMixturesVDSSBPostProcessingPipeline(
     for more info check https://dx.doi.org/10.1021/acs.jctc.0c00634
     and http://dx.doi.org/10.1063/1.4918558
     """
+
     def __str__(self):
 
         return 'vDSSB_gaussian_mixtures_pipeline'
@@ -842,6 +869,7 @@ class JarzynskiPostProcessingAlchemicalLeg(PostProcessingSuperclass,
 
     see documentation for `PostProcessingSuperclass` and `JarzynskiFreeEnergyMixIn`
     """
+
     def __str__(self):
 
         return 'standard_jarzynski_pipeline'
@@ -857,6 +885,7 @@ class GaussianMixturesPostProcessingAlchemicalLeg(
 
     see documentation for `PostProcessingSuperclass` and `GaussianMixtureFreeEnergyMixIn`
     """
+
     def __str__(self):
 
         return 'standard_gaussian_mixtures_pipeline'

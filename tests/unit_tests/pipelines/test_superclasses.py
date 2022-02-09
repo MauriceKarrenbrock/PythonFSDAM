@@ -22,6 +22,7 @@ import PythonFSDAM.pipelines.superclasses as _super
 
 
 class TestIntegrateWorksMixIn():
+
     def test_integrate_work_files(self, mocker):
 
         m_wrk = mocker.patch(
@@ -92,6 +93,7 @@ class TestIntegrateWorksMixIn():
 
 
 class TestFreeEnergyCorrectionsMixIn():
+
     def test_volume_com_com_correction(self, mocker):
 
         m_parse = mocker.patch(
@@ -119,6 +121,7 @@ class TestFreeEnergyCorrectionsMixIn():
 
 
 class TestFreeEnergyMixInSuperclass():
+
     def test_all_notimplementederror(self):
 
         tmp_class = _super.FreeEnergyMixInSuperclass()
@@ -141,6 +144,7 @@ class TestFreeEnergyMixInSuperclass():
 
 
 class TestJarzynskiFreeEnergyMixIn():
+
     def test_calculate_free_energy(self, mocker):
 
         m_free = mocker.patch(
@@ -205,6 +209,7 @@ class TestJarzynskiFreeEnergyMixIn():
 
 
 class TestGaussianMixtureFreeEnergyMixIn():
+
     def test__write_gaussians(self, mocker):
 
         m_write = mocker.patch(
@@ -315,6 +320,7 @@ class TestGaussianMixtureFreeEnergyMixIn():
 
 
 class TestPostProcessingSuperclass():
+
     def test__init__(self):
 
         test_class = _super.PostProcessingSuperclass(
@@ -347,6 +353,15 @@ class TestPostProcessingSuperclass():
 
         m_savetxt = mocker.patch('numpy.savetxt')
 
+        m_anderson = mocker.patch('scipy.stats.anderson')
+
+        class AndersonOutput():
+
+            def __init__(self):
+                self.statistic = -100
+
+        m_anderson.return_value = AndersonOutput()
+
         m_write = mocker.patch(
             'PythonAuxiliaryFunctions.files_IO.write_file.write_file')
 
@@ -377,7 +392,10 @@ class TestPostProcessingSuperclass():
             'work_values.dat',
             -1,
             header=('work_values work values Kcal/mol '
-                    f'(outliers with z score > {3.0} were purged)'))
+                    f'(outliers with z score > {3.0} were purged) '
+                    f'ANDERSON_TEST_VALUE={-100}'))
+
+        m_anderson.assert_called()
 
         expected_lines = [
             '# not_defined_pipeline\n',
@@ -390,6 +408,7 @@ class TestPostProcessingSuperclass():
 
 
 class TestVDSSBPostProcessingSuperclass():
+
     def test__init__(self):
 
         test_class = _super.VDSSBPostProcessingPipeline(
@@ -427,6 +446,14 @@ class TestVDSSBPostProcessingSuperclass():
                                     return_value=(-5, -4))
 
         m_savetxt = mocker.patch('numpy.savetxt')
+        m_anderson = mocker.patch('scipy.stats.anderson')
+
+        class AndersonOutput():
+
+            def __init__(self):
+                self.statistic = -100
+
+        m_anderson.return_value = AndersonOutput()
 
         m_combine = mocker.patch(
             'PythonFSDAM.combine_works.combine_non_correlated_works',
@@ -470,18 +497,23 @@ class TestVDSSBPostProcessingSuperclass():
                 'bound_work_values.dat',
                 -1,
                 header=('bound work values after z score purging Kcal/mol '
-                        f'(outliers with z score > {3.0} were purged)')),
+                        f'(outliers with z score > {3.0} were purged) '
+                        f'ANDERSON_TEST_VALUE={-100}')),
             mock.call(
                 'unbound_work_values.dat',
                 -1,
                 header=('unbound work values after z score purging Kcal/mol '
-                        f'(outliers with z score > {3.0} were purged)')),
+                        f'(outliers with z score > {3.0} were purged) '
+                        f'ANDERSON_TEST_VALUE={-100}')),
             mock.call('combined_work_values.dat',
                       55,
-                      header=('combined_work_values work values Kcal/mol'))
+                      header=('combined_work_values work values Kcal/mol '
+                              f'ANDERSON_TEST_VALUE={-100}'))
         ]
 
         m_savetxt.assert_has_calls(calls)
+
+        m_anderson.assert_called()
 
         m_combine.assert_called_once_with(-1, -1)
 
