@@ -182,6 +182,7 @@ def volume_correction(distance_values, temperature=298.15):
 class _vDSSBJarzynskiErrorPropagationHelperClass(object):
     """helper class
     """
+
     def __init__(self, temperature, boltzmann_kappa):
 
         self.temperature = temperature
@@ -285,10 +286,10 @@ def plain_jarzynski_error_propagation(works,
 
 
 def crooks_free_energy_for_gaussian_distributions(mean,
-                                                std,
-                                                temperature=298.15,
-                                                boltzmann_kappa=0.001985875):
-        """Unidirectional Crooks free energy for gaussian distributions
+                                                  std,
+                                                  temperature=298.15,
+                                                  boltzmann_kappa=0.001985875):
+    """Unidirectional Crooks free energy for gaussian distributions
 
         Parameters
         -----------
@@ -311,11 +312,11 @@ def crooks_free_energy_for_gaussian_distributions(mean,
         ---------
         The calculation done is mean - 0.5 * (std**2) * (1/kb*T)
         """
-        kappa_T = boltzmann_kappa * temperature
+    kappa_T = boltzmann_kappa * temperature
 
-        beta = 1. / kappa_T
+    beta = 1. / kappa_T
 
-        return mean - 0.5 * (std**2) * beta
+    return mean - 0.5 * (std**2) * beta
 
 
 def gaussian_mixtures_free_energy(works,
@@ -323,7 +324,8 @@ def gaussian_mixtures_free_energy(works,
                                   boltzmann_kappa=0.001985875,
                                   n_gaussians=3,
                                   tol=1.E-6,
-                                  max_iterations=None):
+                                  max_iterations=None,
+                                  gaussians=None):
     """Calculates the free energy with the gaussian mixtures method
 
     starting from the non equilibrium works obtained
@@ -335,7 +337,7 @@ def gaussian_mixtures_free_energy(works,
 
     uses expectation maximization to fit the data
 
-    DOES NOT DO A VOLUME CORRECTION NOR AN ERROR ESTIMATE!!!!!!!!
+    DOES NOT DO A VOLUME CORRECTION NOR AN ERROR ESTIMATE!
 
     Parameters
     -----------
@@ -351,21 +353,32 @@ def gaussian_mixtures_free_energy(works,
         the Boltzmann constant, the dafault is 0.001985875 kcal/(mol⋅K)
         and if you keep it the `works` shall be in Kcal
     n_gaussians : int
-        the maximum number gaussians to use for the fit (will always start with one and go on)
+        the number gaussians to use for the fit
     tol : float, optional, default=1.E-6
         the tollerance for the convergence
     max_iterations : int, optional, default=`sys.maxsize`
         maximum number of iterations for each time it tries to
         fit with a certain number of gaussians
+    gaussians : list(dict), optional, default=None
+        the gaussians to use to start the fitting, len(gaussians)
+        must be equal to n_gaussians, if not given a defaut will be used,
+        the format of the gaussian_dictionary must be {'mu': float, 'sigma': float}
 
     Returns
     ----------
     free_energy : float
         the value of the free energy
         if you used the default `boltzmann_kappa` and the
-        `works` where in Kcal it is in Kcal/mol
-    gaussians : list of dict
-        the gaussians used to fit the values
+        `works` are in Kcal it is in Kcal/mol
+    gaussians : list(dict)
+        a list of dicts containing the parameters of the `n_gaussians` gaussians
+        the parameters are (and keys of the dicts):
+        'mu' = the mean (float)
+        'sigma' = the sigma (std) of the gaussian (float)
+        'lambda = the normalized coefficient of the gaussian (float)
+    log_likelyhood : float
+        the logarithm of the total likelihood
+
 
     Raises
     ------------
@@ -380,10 +393,6 @@ def gaussian_mixtures_free_energy(works,
     \Delta G = k_b T ln( \sum w_i e^( \mu - \beta \sigma^2 / 2))
     """
 
-    results = []
-
-    gaussians = []
-
     kappa_T = boltzmann_kappa * temperature
 
     beta = 1. / kappa_T
@@ -394,89 +403,51 @@ def gaussian_mixtures_free_energy(works,
         kept in order not to modify the rest of the function
         when I extracted it from here
         """
-        return crooks_free_energy_for_gaussian_distributions(mean=mean,
-                                                std=var,
-                                                temperature=temperature,
-                                                boltzmann_kappa=boltzmann_kappa)
+        return crooks_free_energy_for_gaussian_distributions(
+            mean=mean,
+            std=var,
+            temperature=temperature,
+            boltzmann_kappa=boltzmann_kappa)
 
-    for i in range(n_gaussians):
+    try:
 
-        try:
+        em_object = em.EMGauss(works,
+                               n_gaussians=n_gaussians,
+                               tol=tol,
+                               max_iterations=max_iterations)
 
-            em_object = em.EMGauss(works,
-                                   n_gaussians=i + 1,
-                                   tol=tol,
-                                   max_iterations=max_iterations)
+        em_object.set_starting_gaussians(gaussians)
 
-            em_object.set_starting_gaussians(gaussians)
+    except ValueError:
 
-        except ValueError:
+        em_object = em.EMGauss(works,
+                               n_gaussians=n_gaussians,
+                               tol=tol,
+                               max_iterations=max_iterations)
 
-            em_object = em.EMGauss(works,
-                                   n_gaussians=i + 1,
-                                   tol=tol,
-                                   max_iterations=max_iterations)
+    gaussians, log_likelyhood = em_object.fit()
 
-        try:
+    exponents = np.empty(len(gaussians))
 
-            gaussians, log_likelyhood = em_object.fit()
+    for j, gaussian in enumerate(gaussians):
 
-        except RuntimeError:
+        exponents[j] = crooks_for_gaussian(gaussian['mu'], gaussian['sigma'])
 
-            continue
+    exponents *= (-beta)
 
-        exponents = np.empty(len(gaussians))
+    exponents = np.exp(exponents)
 
-        for j, gaussian in enumerate(gaussians):
+    for j, gaussian in enumerate(gaussians):
 
-            exponents[i] = crooks_for_gaussian(gaussian['mu'],
-                                               gaussian['sigma'])
+        exponents[j] *= gaussian['lambda']
 
-        exponents *= (-beta)
+    delta_G = np.sum(exponents)
 
-        exponents = np.exp(exponents)
+    del exponents
 
-        for j, gaussian in enumerate(gaussians):
+    delta_G = (-kappa_T) * math.log(delta_G)
 
-            exponents[j] *= gaussian['lambda']
-
-        delta_G = np.sum(exponents)
-
-        #no valid solution with this number of gaussians
-        if delta_G == 0.:
-
-            gaussians = []
-
-            continue
-
-        del exponents
-
-        delta_G = (-kappa_T) * math.log(delta_G)
-
-        results.append({
-            'gaussians': gaussians,
-            'log_likelyhood': log_likelyhood,
-            'delta_G': delta_G
-        })
-
-    if not results:
-
-        raise RuntimeError('Could not converge fitting')
-
-    #find the result with max log_likelyhood
-    k = 0
-    max_log_likelyhood = results[0]['log_likelyhood']
-
-    for j, result in enumerate(results):
-
-        if result['log_likelyhood'] > max_log_likelyhood:
-
-            max_log_likelyhood = result['log_likelyhood']
-
-            k = j
-
-    return results[k]['delta_G'], results[j]['gaussians'], results[j][
-        'log_likelyhood']
+    return delta_G, gaussians, log_likelyhood
 
 
 # by using this class I can choose the temp and K inside the bootstrapping function
@@ -484,26 +455,38 @@ def gaussian_mixtures_free_energy(works,
 class _vDSSBGaussianMixturesErrorPropagationHelperClass(object):
     """helper class
     """
-    def __init__(self, temperature, boltzmann_kappa, n_gaussians, tol,
-                 max_iterations):
+
+    def __init__(self,
+                 temperature,
+                 boltzmann_kappa,
+                 n_gaussians,
+                 tol,
+                 max_iterations,
+                 gaussians=None):
 
         self.temperature = temperature
         self.boltzmann_kappa = boltzmann_kappa
         self.n_gaussians = n_gaussians
         self.tol = tol
         self.max_iterations = max_iterations
+        self.gaussians = gaussians
+
+        self.log_likelyhood = []
 
     def calculate_gaussian_mixtures(self, values):
         """helper method
         """
 
-        energy, _, _ = gaussian_mixtures_free_energy(
+        energy, self.gaussians, log_likelyhood = gaussian_mixtures_free_energy(
             values,
             temperature=self.temperature,
             boltzmann_kappa=self.boltzmann_kappa,
             n_gaussians=self.n_gaussians,
             tol=self.tol,
-            max_iterations=self.max_iterations)
+            max_iterations=self.max_iterations,
+            gaussians=self.gaussians)
+
+        self.log_likelyhood.append(log_likelyhood)
 
         return energy
 
@@ -516,7 +499,7 @@ def VDSSB_gaussian_mixtures_error_propagation(works_1,
                                               num_iterations=50,
                                               n_gaussians=3,
                                               tol=1.E-6,
-                                              max_iterations=None):
+                                              max_iterations=20000):
     """get STD of gaussian mixture free energy obtained by convolution of bound & unbound work
 
     uses vDSSB approach
@@ -547,8 +530,9 @@ def VDSSB_gaussian_mixtures_error_propagation(works_1,
 
     Returns
     ----------
-    STD, mean : float, float
-        the STD of the Gaussian extimate estimate and it's bootstrapped mean value
+    STD, mean, mean_log_likelyhood : float, float, float
+        the STD of the Gaussian extimate estimate, it's bootstrapped mean value,
+        and the mean of the log_likelyhood
 
     Notes
     -----------
@@ -572,7 +556,10 @@ def VDSSB_gaussian_mixtures_error_propagation(works_1,
         stat_function=helper_obj.calculate_gaussian_mixtures,
         num_iterations=num_iterations)
 
-    return out_std, out_mean
+    # Get the mean of the log_likelyhood
+    mean_log_likelyhood = np.mean(np.array(helper_obj.log_likelyhood))
+
+    return out_std, out_mean, mean_log_likelyhood
 
 
 def plain_gaussian_mixtures_error_propagation(works,
@@ -582,7 +569,7 @@ def plain_gaussian_mixtures_error_propagation(works,
                                               num_iterations=10000,
                                               n_gaussians=3,
                                               tol=1.E-6,
-                                              max_iterations=None):
+                                              max_iterations=20000):
     """gaussian mixstures STD via bootstrap
 
     it doesn't use the vDSSB aproach, but only the normal
@@ -606,6 +593,12 @@ def plain_gaussian_mixtures_error_propagation(works,
         check `gaussian_mixtures_free_energy`
     max_iterations
         check `gaussian_mixtures_free_energy`
+
+    Returns
+    ----------
+    STD, mean, mean_log_likelyhood : float, float, float
+        the STD of the Gaussian extimate estimate, it's bootstrapped mean value,
+        and the mean of the log_likelyhood
     """
 
     helper_obj = _vDSSBGaussianMixturesErrorPropagationHelperClass(
@@ -620,4 +613,7 @@ def plain_gaussian_mixtures_error_propagation(works,
         function=helper_obj.calculate_gaussian_mixtures,
         num_iterations=num_iterations)
 
-    return out_std, out_mean
+    # Get the mean of the log_likelyhood
+    mean_log_likelyhood = np.mean(np.array(helper_obj.log_likelyhood))
+
+    return out_std, out_mean, mean_log_likelyhood

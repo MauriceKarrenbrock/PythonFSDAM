@@ -42,6 +42,7 @@ class EMGauss(object):
         you can set some or all the starting gaussians
         for the fitting
     """
+
     def __init__(self, values, n_gaussians=3, tol=1.E-6, max_iterations=None):
 
         self.values = values
@@ -301,8 +302,8 @@ class EMGauss(object):
             if iteration == self.max_iterations - 1:
 
                 raise RuntimeError(
-                    f'Could not converge EM gaussian mixing with {self.n_gaussians} gaussians'
-                )
+                    f'Could not converge EM gaussian mixing with {self.n_gaussians} gaussians '
+                    f'in {self.max_iterations} iterations')
 
             new_log_lambda, weights_matrix = self._expectation_maximization(
                 weights_matrix)

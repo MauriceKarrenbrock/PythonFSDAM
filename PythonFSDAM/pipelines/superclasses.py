@@ -352,7 +352,7 @@ class GaussianMixtureFreeEnergyMixIn(FreeEnergyMixInSuperclass):
         """
 
         energy, gaussians, log_likelyhood = free_energy_calculations.gaussian_mixtures_free_energy(
-            works, temperature)
+            works, temperature, n_gaussians=self.n_gaussians)  # pylint: disable=no-member)
 
         #in order to be able to check the quality of the fit
         self._write_gaussians(gaussians, log_likelyhood)
@@ -383,29 +383,35 @@ class GaussianMixtureFreeEnergyMixIn(FreeEnergyMixInSuperclass):
 
         return energy
 
-    @staticmethod
-    def calculate_standard_deviation(works, temperature):
+    def calculate_standard_deviation(self, works, temperature):
         """calculates STD of the free energy with bootstrapping
 
         it is a wrapper of
         `PythonFSDAM.free_energy_calculations.plain_gaussian_mixtures_error_propagation`
         """
 
-        STD, mean = free_energy_calculations.plain_gaussian_mixtures_error_propagation(
-            works, temperature=temperature)
+        STD, mean, mean_log_likelyhood = free_energy_calculations.plain_gaussian_mixtures_error_propagation(
+            works, temperature=temperature, n_gaussians=self.n_gaussians)  # pylint: disable=no-member
+
+        self.mean_log_likelyhood = mean_log_likelyhood
 
         return STD, mean
 
-    @staticmethod
-    def vdssb_calculate_standard_deviation(works_1, works_2, temperature):
+    def vdssb_calculate_standard_deviation(self, works_1, works_2,
+                                           temperature):
         """calculates STD of the free energy with bootstrapping vDSSB
 
         it is a wrapper of
         `PythonFSDAM.free_energy_calculations.VDSSB_gaussian_mixtures_error_propagation`
         """
 
-        STD, mean = free_energy_calculations.VDSSB_gaussian_mixtures_error_propagation(
-            works_1, works_2, temperature=temperature)
+        STD, mean, mean_log_likelyhood = free_energy_calculations.VDSSB_gaussian_mixtures_error_propagation(
+            works_1,
+            works_2,
+            temperature=temperature,
+            n_gaussians=self.n_gaussians)  # pylint: disable=no-member
+
+        self.mean_log_likelyhood = mean_log_likelyhood
 
         return STD, mean
 
@@ -581,6 +587,7 @@ class PostProcessingSuperclass(Pipeline, FreeEnergyMixInSuperclass,
     """
 
     def __init__(self,
+                 *,
                  dhdl_files,
                  vol_correction_distances=None,
                  temperature=298.15,
@@ -602,6 +609,18 @@ class PostProcessingSuperclass(Pipeline, FreeEnergyMixInSuperclass,
     def __str__(self):
 
         return 'not_defined_pipeline'
+
+    def _write_free_energy_file(self, STD):
+        """Private
+        """
+
+        # print the values of delta G and the confidence intervall (95%)
+        lines = [
+            f'# {str(self)}\n',
+            '# Delta_G  STD  confidence_intervall_95%(1.96STD)  unit=Kcal/mol\n',
+            f'{self._free_energy_value:.18e} {STD:.18e} {1.96*STD:.18e}\n'
+        ]
+        _write.write_file(lines, f'{str(self)}_free_energy.dat')
 
     def execute(self):
         """calculate free energy
@@ -642,13 +661,7 @@ class PostProcessingSuperclass(Pipeline, FreeEnergyMixInSuperclass,
 
         self._free_energy_value += free_energy
 
-        # print the values of delta G and the confidence intervall (95%)
-        lines = [
-            f'# {str(self)}\n',
-            '# Delta_G  STD  confidence_intervall_95%(1.96STD)  unit=Kcal/mol\n',
-            f'{self._free_energy_value:.18e} {STD:.18e} {1.96*STD:.18e}\n'
-        ]
-        _write.write_file(lines, f'{str(self)}_free_energy.dat')
+        self._write_free_energy_file(STD)
 
         return self._free_energy_value, STD
 
@@ -694,6 +707,7 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
     """
 
     def __init__(self,
+                 *,
                  bound_state_dhdl,
                  unbound_state_dhdl,
                  vol_correction_distances_bound_state=None,
@@ -718,6 +732,18 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
     def __str__(self):
 
         return 'vDSSB_not_defined_pipeline'
+
+    def _write_free_energy_file(self, STD):
+        """Private
+        """
+
+        # print the values of delta G and the confidence intervall (95%)
+        lines = [
+            f'# {str(self)}\n',
+            '# Delta_G  STD  confidence_intervall_95%(1.96STD)  unit=Kcal/mol\n',
+            f'{self._free_energy_value:.18e} {STD:.18e} {1.96*STD:.18e}\n'
+        ]
+        _write.write_file(lines, f'{str(self)}_free_energy.dat')
 
     def execute(self):
         """Calculates the free energy
@@ -812,13 +838,7 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
                     temperature=self.temperature,
                     md_program=self.md_program)
 
-        # print the values of delta G and the confidence intervall (2 sigma)
-        lines = [
-            f'# {str(self)}\n',
-            '# Delta_G  STD  confidence_intervall_95%(1.96STD)  unit=Kcal/mol\n',
-            f'{self._free_energy_value:.18e} {STD:.18e} {1.96*STD:.18e}\n'
-        ]
-        _write.write_file(lines, f'{str(self)}_free_energy.dat')
+        self._write_free_energy_file(STD)
 
         return self._free_energy_value, STD
 
@@ -848,15 +868,42 @@ class GaussianMixturesVDSSBPostProcessingPipeline(
     The distances for this class must be in Angstrom and the energies will always be in
     Kcal/mol
 
+    Parameters
+    ------------
+    n_gaussians : int, default=3
+        the number of gaussians to use for the fitting
+    **kwargs
+        all the needed arguments of the superclass
+
     Notes
     ----------
     for more info check https://dx.doi.org/10.1021/acs.jctc.0c00634
     and http://dx.doi.org/10.1063/1.4918558
     """
 
+    def __init__(self, *, n_gaussians=3, **kwargs):
+
+        super().__init__(**kwargs)
+
+        self.n_gaussians = n_gaussians
+        self.mean_log_likelyhood = None
+
     def __str__(self):
 
-        return 'vDSSB_gaussian_mixtures_pipeline'
+        return f'vDSSB_gaussian_mixtures_pipeline_N_gaussians_{self.n_gaussians}'
+
+    def _write_free_energy_file(self, STD):
+        """Private
+        """
+
+        # print the values of delta G and the confidence intervall (95%)
+        lines = [
+            f'# {str(self)}\n',
+            '# Delta_G  STD  confidence_intervall_95%(1.96STD)  unit=Kcal/mol\n',
+            f'# Mean log likelyhood = {self.mean_log_likelyhood}'
+            f'{self._free_energy_value:.18e} {STD:.18e} {1.96*STD:.18e}\n'
+        ]
+        _write.write_file(lines, f'{str(self)}_free_energy.dat')
 
 
 class JarzynskiPostProcessingAlchemicalLeg(PostProcessingSuperclass,
@@ -884,8 +931,35 @@ class GaussianMixturesPostProcessingAlchemicalLeg(
     post processes everything together
 
     see documentation for `PostProcessingSuperclass` and `GaussianMixtureFreeEnergyMixIn`
+
+    Parameters
+    ------------
+    n_gaussians : int, default=3
+        the number of gaussians to use for the fitting
+    **kwargs
+        all the needed arguments of the superclass
     """
+
+    def __init__(self, *, n_gaussians=3, **kwargs):
+
+        super().__init__(**kwargs)
+
+        self.n_gaussians = n_gaussians
+        self.mean_log_likelyhood = None
 
     def __str__(self):
 
-        return 'standard_gaussian_mixtures_pipeline'
+        return f'standard_gaussian_mixtures_pipeline_N_gaussians_{self.n_gaussians}'
+
+    def _write_free_energy_file(self, STD):
+        """Private
+        """
+
+        # print the values of delta G and the confidence intervall (95%)
+        lines = [
+            f'# {str(self)}\n',
+            '# Delta_G  STD  confidence_intervall_95%(1.96STD)  unit=Kcal/mol\n',
+            f'# Mean log likelyhood = {self.mean_log_likelyhood}'
+            f'{self._free_energy_value:.18e} {STD:.18e} {1.96*STD:.18e}\n'
+        ]
+        _write.write_file(lines, f'{str(self)}_free_energy.dat')

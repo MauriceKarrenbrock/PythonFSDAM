@@ -289,29 +289,33 @@ class TestGaussianMixtureFreeEnergyMixIn():
 
         m_std = mocker.patch(
             'PythonFSDAM.free_energy_calculations.plain_gaussian_mixtures_error_propagation',
-            return_value=(-1, -2))
+            return_value=(-1, -2, 0))
 
         tmp_class = _super.GaussianMixtureFreeEnergyMixIn()
+
+        tmp_class.n_gaussians = 3
 
         output = tmp_class.calculate_standard_deviation(1, 2)
 
         assert output == (-1, -2)
 
-        m_std.assert_called_once_with(1, temperature=2)
+        m_std.assert_called_once_with(1, temperature=2, n_gaussians=3)
 
     def test_vdssb_calculate_standard_deviation(self, mocker):
 
         m_std = mocker.patch(
             'PythonFSDAM.free_energy_calculations.VDSSB_gaussian_mixtures_error_propagation',
-            return_value=(-1, -2))
+            return_value=(-1, -2, 0))
 
         tmp_class = _super.GaussianMixtureFreeEnergyMixIn()
+
+        tmp_class.n_gaussians = 3
 
         output = tmp_class.vdssb_calculate_standard_deviation(1, 2, 3)
 
         assert output == (-1, -2)
 
-        m_std.assert_called_once_with(1, 2, temperature=3)
+        m_std.assert_called_once_with(1, 2, temperature=3, n_gaussians=3)
 
 
 #############################################################
@@ -324,7 +328,7 @@ class TestPostProcessingSuperclass():
     def test__init__(self):
 
         test_class = _super.PostProcessingSuperclass(
-            ['files'],
+            dhdl_files=['files'],
             vol_correction_distances=['dist'],
             temperature=1,
             md_program='MD',
@@ -366,7 +370,7 @@ class TestPostProcessingSuperclass():
             'PythonAuxiliaryFunctions.files_IO.write_file.write_file')
 
         test_class = _super.PostProcessingSuperclass(
-            ['files'],
+            dhdl_files=['files'],
             vol_correction_distances=['dist'],
             temperature=1,
             md_program='MD',
