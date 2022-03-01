@@ -152,9 +152,10 @@ disable=print-statement,
         consider-using-enumerate,
         too-many-locals,
         too-many-branches,
-        duplicate-code
-	anomalous-backslash-in-string
-	consider-using-from-import
+        duplicate-code,
+	anomalous-backslash-in-string,
+	consider-using-from-import,
+        use-dict-literal
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option

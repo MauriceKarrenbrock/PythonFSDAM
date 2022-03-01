@@ -11,58 +11,9 @@
 import os
 from multiprocessing import Pool
 
-import bootstrapped.bootstrap as bs
-import bootstrapped.stats_functions as bs_stats
 import numpy as np
 
 import PythonFSDAM.combine_works as combine_works
-
-
-def standard_deviation(values,
-                       alpha=0.05,
-                       num_iterations=10000,
-                       iteration_batch_size=10,
-                       num_threads=1):
-    """get standard deviation with bootstrapping
-
-    it is a wrapper of bootstrapped.bootstrap.bootstrap function
-    https://github.com/facebookincubator/bootstrapped
-
-    Parameters
-    ------------
-    values : numpy array (or scipy.sparse.csr_matrix)
-        values to bootstrap
-    alpha : float, optional
-        alpha value representing the confidence interval.
-        Defaults to 0.05, i.e., 95th-CI. (2sigma)
-    num_iterations: int, optional
-        number of bootstrap iterations to run. Default 10000
-    iteration_batch_size: int, optional
-        The bootstrap sample can generate very large
-        matrices. This argument limits the memory footprint by
-        batching bootstrap rounds. If unspecified the underlying code
-        will produce a matrix of len(values) x num_iterations. If specified
-        the code will produce sets of len(values) x iteration_batch_size
-        (one at a time) until num_iterations have been simulated.
-        Defaults to 10. Passing None will calculate the full simulation in one step.
-    num_threads: int, optional
-        The number of therads to use. This speeds up calculation of
-        the bootstrap. Defaults to 1. If -1 is specified then the number
-        of CPUs will be counted automatically
-    Returns
-    ------------
-    bootstrappend_STD, (confidence_intervall_lower_bound, confidence_intervall_upper_bound) :
-        float, tuple(float,float)
-    """
-
-    bs_object = bs.bootstrap(values=values,
-                             stat_func=bs_stats.std,
-                             alpha=alpha,
-                             num_iterations=num_iterations,
-                             iteration_batch_size=iteration_batch_size,
-                             num_threads=num_threads)
-
-    return bs_object.value, (bs_object.lower_bound, bs_object.upper_bound)
 
 
 def _mix_and_bootstrap_helper_function(values_1, values_2, mixing_function,
@@ -92,8 +43,8 @@ def mix_and_bootstrap(
         values_1,
         values_2,
         *,
+        stat_function,
         mixing_function=combine_works.combine_non_correlated_works,
-        stat_function=bs_stats.mean,
         num_iterations=10000,
         n_threads=None):
     """complex combining and bootstrapping
@@ -194,7 +145,7 @@ def _fake_mixing_function(values_1, _):
 
 def bootstrap_std_of_function_results(values,
                                       *,
-                                      function=bs_stats.mean,
+                                      function,
                                       num_iterations=10000,
                                       n_threads=None):
     """bootstrap then apply the function then return mean and std

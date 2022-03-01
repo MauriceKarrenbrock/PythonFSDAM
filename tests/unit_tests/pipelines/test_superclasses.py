@@ -257,11 +257,13 @@ class TestGaussianMixtureFreeEnergyMixIn():
 
         tmp_class = _super.GaussianMixtureFreeEnergyMixIn()
 
+        tmp_class.n_gaussians = 3
+
         output = tmp_class.calculate_free_energy(1, 2)
 
         assert output == -1
 
-        m_free.assert_called_once_with(1, 2)
+        m_free.assert_called_once_with(1, 2, n_gaussians=3)
 
         m_write.assert_called_once_with(-2, -3)
 
@@ -276,6 +278,8 @@ class TestGaussianMixtureFreeEnergyMixIn():
                                      return_value=-1)
 
         tmp_class = _super.GaussianMixtureFreeEnergyMixIn()
+
+        tmp_class.n_gaussians = 3
 
         output = tmp_class.vdssb_calculate_free_energy(1, 2, 3)
 

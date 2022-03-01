@@ -18,66 +18,34 @@ import pytest
 import PythonFSDAM.bootstrapping as boot
 
 
-class Teststandard_deviation():
-    def test_works(self, mocker):
-        class MockBootResult():
-            def __init__(self):
-
-                self.value = 1.
-
-                self.lower_bound = -1.
-
-                self.upper_bound = 2.
-
-        boot_out = MockBootResult()
-
-        m_boot = mocker.patch('bootstrapped.bootstrap.bootstrap',
-                              return_value=boot_out)
-        m_std = mocker.patch('bootstrapped.stats_functions.std')
-
-        values = np.array([1., 2., 3.])
-
-        alpha = 0.05
-        num_iterations = 10000
-        iteration_batch_size = 10
-        num_threads = 1
-
-        output = boot.standard_deviation(
-            values,
-            alpha=alpha,
-            num_iterations=num_iterations,
-            iteration_batch_size=iteration_batch_size,
-            num_threads=num_threads)
-
-        assert output == (1., (-1., 2.))
-
-        m_boot.assert_called_once_with(
-            values=values,
-            stat_func=m_std,
-            alpha=alpha,
-            num_iterations=num_iterations,
-            iteration_batch_size=iteration_batch_size,
-            num_threads=num_threads)
-
-
 class Testmix_and_bootstrap():
+
     def test_valueerror(self):
 
         with pytest.raises(ValueError):
 
-            boot.mix_and_bootstrap([1], [2], num_iterations=0)
+            boot.mix_and_bootstrap([1], [2],
+                                   num_iterations=0,
+                                   stat_function=lambda: None)
 
         with pytest.raises(ValueError):
 
-            boot.mix_and_bootstrap([1], [2], num_iterations=-1)
+            boot.mix_and_bootstrap([1], [2],
+                                   num_iterations=-1,
+                                   stat_function=lambda: None)
 
     def test_keywordonly_arguments(self):
+
         def dum(x):
             return x
 
         with pytest.raises(TypeError):
 
-            boot.mix_and_bootstrap([1], [2], dum, dum, 10000)  # pylint: disable=too-many-function-args
+            boot.mix_and_bootstrap(  # pylint: disable=too-many-function-args
+                [1], [2],
+                dum,
+                10000,
+                stat_function=lambda: None)  # pylint: disable=too-many-function-args
 
     def test_works(self, mocker):
 
@@ -213,6 +181,7 @@ class Testmix_and_bootstrap():
 
 
 class Test_mix_and_bootstrap_helper_function():
+
     def test_works(self, mocker):
 
         m_mixing = mock.MagicMock()
@@ -245,12 +214,14 @@ class Test_mix_and_bootstrap_helper_function():
 
 
 class Test_fake_mixing_function():
+
     def test_works(self):
 
         assert boot._fake_mixing_function(1., 2.) == 1.
 
 
 class Testbootstrap_std_of_function_results():
+
     def test_works(self, mocker):
 
         m_mix = mocker.patch('PythonFSDAM.bootstrapping.mix_and_bootstrap',
