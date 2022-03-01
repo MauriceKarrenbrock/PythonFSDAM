@@ -181,6 +181,7 @@ class WorkResults(object):
         For confidence intervall 2*std (95%) is usually a good value
         check `bootstrapping.standard_deviation` for more info
     """
+
     def __init__(self, number_of_works):
 
         self.number_of_works = number_of_works
@@ -358,7 +359,7 @@ def make_work_vs_lambda_csv(work_files,
                 tmp_df['lambda'] = tmp_df['lambda'].values - df[
                     'lambda'].values[0]
 
-        df = df.append(tmp_df, ignore_index=True)
+        df = pd.concat([df, tmp_df], ignore_index=True)
 
     if csv_name is None:
         if creation:
