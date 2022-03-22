@@ -15,6 +15,7 @@ import PythonFSDAM.free_energy_calculations as free
 
 
 class Testjarzynski_free_energy():
+
     def test_calls(self, mocker):
 
         m_min = mocker.patch('numpy.amin', return_value=1.)
@@ -36,6 +37,7 @@ class Testjarzynski_free_energy():
 
 
 class Testweighted_jarzynski_free_energy():
+
     def test_works(self, mocker):
 
         works = np.zeros(5)
@@ -54,7 +56,31 @@ class Testweighted_jarzynski_free_energy():
         m_jarzynski.assert_called_once()
 
 
+class Testjarzynski_bias_estimation():
+
+    def test_works(self, mocker):
+        m_normal = mocker.patch('scipy.stats.norm.rvs',
+                                return_value='NORMAL POINTS')
+
+        m_jarzynski = mocker.patch(
+            'PythonFSDAM.free_energy_calculations.jarzynski_free_energy',
+            return_value=0.)
+
+        output = free.jarzynski_bias_estimation(0.,
+                                                5,
+                                                n_generated_distributions=1)
+
+        assert output == 0.
+
+        m_normal.assert_called_once_with(loc=0, scale=0., size=5)
+
+        m_jarzynski.assert_called_once_with('NORMAL POINTS',
+                                            temperature=298.15,
+                                            boltzmann_kappa=0.001985875)
+
+
 class Testvolume_correction():
+
     def test_calls(self, mocker):
 
         m_std = mocker.patch('numpy.std', return_value=1.)
@@ -73,6 +99,7 @@ class Testvolume_correction():
 
 
 class TestvDSSB_jarzynski_error_propagation():
+
     def test_works(self, mocker):
 
         m_boot = mocker.patch('PythonFSDAM.bootstrapping.mix_and_bootstrap',
@@ -89,6 +116,7 @@ class TestvDSSB_jarzynski_error_propagation():
 
 
 class Testplain_jarzynski_error_propagation():
+
     def test_works(self, mocker):
 
         m_heper = mocker.patch(

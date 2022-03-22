@@ -311,6 +311,28 @@ class JarzynskiFreeEnergyMixIn(FreeEnergyMixInSuperclass):
 
         return STD, mean
 
+    @staticmethod
+    def calculate_jarzynski_bias(works, temperature):
+        """Estimates the bias in the Jarzynski free energy for normal distributions
+
+        it is a wrapper of `PythonFSDAM.free_energy_calculations.jarzynski_bias_estimation`
+        """
+
+        STD = np.std(works)
+
+        return free_energy_calculations.jarzynski_bias_estimation(
+            STD, works.size, temperature)
+
+    def vdssb_calculate_jarzynski_bias(self, works_1, works_2, temperature):
+        """Estimates the bias in the Jarzynski free energy for normal distributions
+
+        it is a wrapper of `PythonFSDAM.free_energy_calculations.jarzynski_bias_estimation`
+        """
+
+        works = combine_works.combine_non_correlated_works(works_1, works_2)
+
+        return self.calculate_jarzynski_bias(works, temperature)
+
 
 class GaussianMixtureFreeEnergyMixIn(FreeEnergyMixInSuperclass):
     """MixIn for gaussian mixtures free energy calcutations
@@ -622,6 +644,9 @@ class PostProcessingSuperclass(Pipeline, FreeEnergyMixInSuperclass,
         ]
         _write.write_file(lines, f'{str(self)}_free_energy.dat')
 
+    def _hook(self, works):
+        """Virtual method"""
+
     def execute(self):
         """calculate free energy
 
@@ -662,6 +687,8 @@ class PostProcessingSuperclass(Pipeline, FreeEnergyMixInSuperclass,
         self._free_energy_value += free_energy
 
         self._write_free_energy_file(STD)
+
+        self._hook(work_values)
 
         return self._free_energy_value, STD
 
@@ -745,6 +772,9 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
         ]
         _write.write_file(lines, f'{str(self)}_free_energy.dat')
 
+    def _hook(self, works_1, works_2):
+        """Virtual method"""
+
     def execute(self):
         """Calculates the free energy
 
@@ -805,6 +835,8 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
         combined_work_values = combine_works.combine_non_correlated_works(
             bound_work_values, unbound_work_values)
 
+        self._hook(bound_work_values, unbound_work_values)
+
         del bound_work_values
         del unbound_work_values
 
@@ -859,6 +891,27 @@ class JarzynskiVDSSBPostProcessingPipeline(VDSSBPostProcessingPipeline,
     def __str__(self):
 
         return 'vDSSB_jarzynski_pipeline'
+
+    def _hook(self, works_1, works_2):
+        """private
+        """
+        jarzynski_bias = self.vdssb_calculate_jarzynski_bias(
+            works_1, works_2, self.temperature)
+
+        lines = ('# Estimation of the bias of the jarzanski free energy '
+                 'for the convoluted work values\n'
+                 '# This estimate is correct for normal work distributions\n'
+                 '# You can check the anderson-darling test for normality in '
+                 'the first line of the convoluted work values file\n'
+                 '# Check equation 11 of ref:\n'
+                 '# SAMPL9 blind predictions using\n'
+                 '# nonequilibrium alchemical approaches\n'
+                 '# Piero Procacci and Guido Guarnieri\n'
+                 '# https://arxiv.org/abs/2202.06720\n\n\n'
+                 f'Jarzynski_bias_kcalmol={jarzynski_bias:.18e}\n')
+
+        with open(f'{str(self)}_jarzanski_bias.dat', 'w') as f:
+            f.write(lines)
 
 
 class GaussianMixturesVDSSBPostProcessingPipeline(
@@ -920,6 +973,25 @@ class JarzynskiPostProcessingAlchemicalLeg(PostProcessingSuperclass,
     def __str__(self):
 
         return 'standard_jarzynski_pipeline'
+
+    def _hook(self, works):
+        """private
+        """
+        jarzynski_bias = self.calculate_jarzynski_bias(works, self.temperature)
+
+        lines = ('# Estimation of the bias of the jarzanski free energy\n'
+                 '# This estimate is correct for normal work distributions\n'
+                 '# You can check the anderson-darling test for normality in '
+                 'the first line of the work values file\n'
+                 '# Check equation 11 of ref:\n'
+                 '# SAMPL9 blind predictions using\n'
+                 '# nonequilibrium alchemical approaches\n'
+                 '# Piero Procacci and Guido Guarnieri\n'
+                 '# https://arxiv.org/abs/2202.06720\n\n\n'
+                 f'Jarzynski_bias_kcalmol={jarzynski_bias:.18e}\n')
+
+        with open(f'{str(self)}_jarzanski_bias.dat', 'w') as f:
+            f.write(lines)
 
 
 class GaussianMixturesPostProcessingAlchemicalLeg(

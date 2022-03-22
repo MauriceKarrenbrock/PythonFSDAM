@@ -10,11 +10,13 @@
 #############################################################
 
 import numpy as np
+import pytest
 
 import PythonFSDAM.free_energy_calculations as free
 
 
 class Testjarzynski_free_energy():
+
     def test_works(self):
 
         works = np.array([1., 2.])
@@ -29,7 +31,19 @@ class Testjarzynski_free_energy():
         assert output == expected
 
 
+class Testjarzynski_bias_estimation():
+
+    def test_works(self):
+
+        output = free.jarzynski_bias_estimation(0.000001,
+                                                int(1E5),
+                                                n_generated_distributions=100)
+
+        assert output == pytest.approx(0., abs=1.0e-8)
+
+
 class Testvolume_correction():
+
     def test_works(self):
 
         distance_values = np.array([1., 2.])

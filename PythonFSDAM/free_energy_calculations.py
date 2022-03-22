@@ -11,6 +11,7 @@
 import math
 
 import numpy as np
+from scipy.stats import norm
 
 import PythonFSDAM.bootstrapping as boot
 import PythonFSDAM.combine_works as combine
@@ -132,6 +133,78 @@ def weighted_jarzynski_free_energy(works,
     free_energy += temperature * boltzmann_kappa * (log_total_weight - log_N)
 
     return free_energy
+
+
+def jarzynski_bias_estimation(work_std,
+                              n_work_values,
+                              temperature=298.15,
+                              boltzmann_kappa=0.001985875,
+                              n_generated_distributions=1000):
+    """Estimates the bias of the Jarzynski free energy value
+
+    If the `work_std` is in Kcal and you keep the default `boltzmann_kappa`
+    = 0.001985875 kcal/(mol⋅K) the result will be in Kcal/mol
+    otherwise it depends on your choice
+
+    The bias is always positive
+
+    This estimation is valid for normal work distributions
+    the less normal they are the less this estimate will be
+    meaningfull
+
+    Parameters
+    -----------
+    work_std : float
+        the standard deviation of your work distribution
+        if you don't modify `boltzmann_kappa`
+        it should be Kcal/mol (1 Kcal = 1/4.148 KJ)
+    n_work_values : int
+        how many work values you have in your distribution
+    temperature : float, optional
+        the temperature in Kelvin at which the non equilibrium simulation
+        has been done, default 298.15 K
+    boltzmann_kappa : float
+        the Boltzmann constant, the dafault is 0.001985875 kcal/(mol⋅K)
+        and if you keep it the `works` shall be in Kcal
+    n_generated_distributions : int, optional, default=100
+        how many random normal distributions to generate
+
+    Returns
+    ----------
+    bias_estimation : float
+        if you used the default `boltzmann_kappa` and the
+        `work_std` where in Kcal it is in Kcal/mol
+
+    References
+    --------------------
+    SAMPL9 blind predictions using
+    nonequilibrium alchemical approaches
+    Piero Procacci and Guido Guarnieri
+
+    https://arxiv.org/abs/2202.06720
+
+    equation 11
+    """
+
+    exp_averages = np.empty(n_generated_distributions)
+
+    for i in range(n_generated_distributions):
+        # Mean=0 STD=work_std
+        random_normal_points = norm.rvs(loc=0,
+                                        scale=work_std,
+                                        size=n_work_values)
+
+        exp_averages[i] = jarzynski_free_energy(
+            random_normal_points,
+            temperature=temperature,
+            boltzmann_kappa=boltzmann_kappa)
+
+        # Free memory in case of very big sizes
+        random_normal_points = None
+
+    variance = work_std * work_std
+
+    return np.mean(exp_averages) + (variance * 0.5)
 
 
 def volume_correction(distance_values, temperature=298.15):
