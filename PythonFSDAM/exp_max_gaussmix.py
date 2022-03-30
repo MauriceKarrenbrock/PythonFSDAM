@@ -78,14 +78,14 @@ class EMGauss(object):
             for empty or for too long inputs
         """
 
+        if not gaussians:
+
+            raise ValueError('gaussians is empty')
+
         if len(gaussians) > self.n_gaussians:
 
             raise ValueError(
                 'The number of given gaussians is bigger than n_gaussians')
-
-        if not gaussians:
-
-            raise ValueError('gaussians is empty')
 
         self._gaussians += gaussians
 

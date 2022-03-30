@@ -470,6 +470,9 @@ def gaussian_mixtures_free_energy(works,
 
     beta = 1. / kappa_T
 
+    if gaussians is None:
+        gaussians = []
+
     def crooks_for_gaussian(mean, var):
         """helper function
 
