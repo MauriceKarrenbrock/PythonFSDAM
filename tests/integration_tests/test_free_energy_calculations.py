@@ -11,6 +11,7 @@
 
 import numpy as np
 import pytest
+from scipy.stats import norm
 
 import PythonFSDAM.free_energy_calculations as free
 
@@ -56,3 +57,17 @@ class Testvolume_correction():
         expected = -3.544695949996799
 
         assert output == expected
+
+
+class TestVDSSB_gaussian_mixtures_error_propagation():
+
+    def test_1_gaussian(self):
+        works_1 = norm.rvs(loc=0, scale=1, size=1000, random_state=1)
+        works_2 = norm.rvs(loc=0, scale=1, size=1000, random_state=2)
+
+        STD, mean, mean_log_likelyhood = free.VDSSB_gaussian_mixtures_error_propagation(
+            works_1, works_2, n_gaussians=1)
+
+        assert isinstance(mean, float)
+        assert isinstance(mean_log_likelyhood, float)
+        assert isinstance(STD, float)

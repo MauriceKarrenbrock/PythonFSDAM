@@ -93,18 +93,17 @@ class EMGauss(object):
         """private
         """
 
-        if len(self._gaussians) == self.n_gaussians:
-
-            return self._gaussians
-
         if not self._gaussians:
 
-            log_lambda = self._append_gaussian(mu, sigma)
+            self._append_gaussian(mu, sigma)
 
         while len(self._gaussians) < self.n_gaussians:
 
-            log_lambda = self._append_gaussian(mu * random.random(),
-                                               sigma * random.random() + 1.E-5)
+            self._append_gaussian(mu * random.random(),
+                                  sigma * random.random() + 1.E-5)
+
+        #re-create a log_lambda
+        log_lambda = float(maxsize)
 
         return log_lambda
 
@@ -260,11 +259,6 @@ class EMGauss(object):
 
             #be sure to have normalized coefficients
             self._gaussians[i]['lambda'] = 1.0 / number_of_gaussians
-
-            #re-create a old_log_lambda
-            old_log_lambda = float(maxsize)
-
-        return old_log_lambda
 
     def fit(self):
         """The main method, fits your dataset with gaussians
