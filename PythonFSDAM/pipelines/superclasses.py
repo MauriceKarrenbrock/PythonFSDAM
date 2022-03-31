@@ -312,26 +312,14 @@ class JarzynskiFreeEnergyMixIn(FreeEnergyMixInSuperclass):
         return STD, mean
 
     @staticmethod
-    def calculate_jarzynski_bias(works, temperature):
+    def calculate_jarzynski_bias(n_values, std, temperature):
         """Estimates the bias in the Jarzynski free energy for normal distributions
 
         it is a wrapper of `PythonFSDAM.free_energy_calculations.jarzynski_bias_estimation`
         """
-
-        STD = np.std(works)
 
         return free_energy_calculations.jarzynski_bias_estimation(
-            STD, works.size, temperature)
-
-    def vdssb_calculate_jarzynski_bias(self, works_1, works_2, temperature):
-        """Estimates the bias in the Jarzynski free energy for normal distributions
-
-        it is a wrapper of `PythonFSDAM.free_energy_calculations.jarzynski_bias_estimation`
-        """
-
-        works = combine_works.combine_non_correlated_works(works_1, works_2)
-
-        return self.calculate_jarzynski_bias(works, temperature)
+            std, n_values, temperature)
 
 
 class GaussianMixtureFreeEnergyMixIn(FreeEnergyMixInSuperclass):
@@ -772,7 +760,7 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
         ]
         _write.write_file(lines, f'{str(self)}_free_energy.dat')
 
-    def _hook(self, works_1, works_2):
+    def _hook(self):
         """Virtual method"""
 
     def execute(self):
@@ -831,8 +819,6 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
         #get free energy
         self._free_energy_value += free_energy
 
-        self._hook(bound_work_values, unbound_work_values)
-
         #make a backup of the combined work values
         combined_work_values = combine_works.combine_non_correlated_works(
             bound_work_values, unbound_work_values)
@@ -872,6 +858,8 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
 
         self._write_free_energy_file(STD)
 
+        self._hook()
+
         return self._free_energy_value, STD
 
 
@@ -892,11 +880,21 @@ class JarzynskiVDSSBPostProcessingPipeline(VDSSBPostProcessingPipeline,
 
         return 'vDSSB_jarzynski_pipeline'
 
-    def _hook(self, works_1, works_2):
+    def _hook(self):
         """private
         """
-        jarzynski_bias = self.vdssb_calculate_jarzynski_bias(
-            works_1, works_2, self.temperature)
+
+        combined_work_values = np.loadtxt('combined_work_values.dat',
+                                          comments='#')
+
+        num_work_values = combined_work_values.size
+        STD = np.std(combined_work_values)
+
+        # To save memory
+        del combined_work_values
+
+        jarzynski_bias = self.calculate_jarzynski_bias(num_work_values, STD,
+                                                       self.temperature)
 
         lines = ('# Estimation of the bias of the jarzanski free energy '
                  'for the convoluted work values\n'
@@ -977,7 +975,14 @@ class JarzynskiPostProcessingAlchemicalLeg(PostProcessingSuperclass,
     def _hook(self, works):
         """private
         """
-        jarzynski_bias = self.calculate_jarzynski_bias(works, self.temperature)
+
+        num_work_values = works.size
+        STD = np.std(works)
+
+        del works
+
+        jarzynski_bias = self.calculate_jarzynski_bias(num_work_values, STD,
+                                                       self.temperature)
 
         lines = ('# Estimation of the bias of the jarzanski free energy\n'
                  '# This estimate is correct for normal work distributions\n'
