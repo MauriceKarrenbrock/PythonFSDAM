@@ -63,7 +63,7 @@ class Testjarzynski_bias_estimation():
                                 return_value='NORMAL POINTS')
 
         m_jarzynski = mocker.patch(
-            'PythonFSDAM.free_energy_calculations.jarzynski_free_energy',
+            'PythonFSDAM.free_energy_calculations.jarzynski_exponential_average',
             return_value=0.)
 
         output = free.jarzynski_bias_estimation(0.,

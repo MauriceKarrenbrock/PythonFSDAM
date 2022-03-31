@@ -36,11 +36,11 @@ class Testjarzynski_bias_estimation():
 
     def test_works(self):
 
-        output = free.jarzynski_bias_estimation(0.000001,
+        output = free.jarzynski_bias_estimation(0.0000001,
                                                 int(1E5),
                                                 n_generated_distributions=100)
 
-        assert output == pytest.approx(0., abs=1.0e-8)
+        assert output == pytest.approx(1., abs=1.0e-2)
 
 
 class Testvolume_correction():

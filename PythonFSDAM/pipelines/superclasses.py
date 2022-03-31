@@ -952,8 +952,8 @@ class GaussianMixturesVDSSBPostProcessingPipeline(
         # print the values of delta G and the confidence intervall (95%)
         lines = [
             f'# {str(self)}\n',
+            #f'# Mean log likelyhood = {self.mean_log_likelyhood}\n', # TODO solve nan problem
             '# Delta_G  STD  confidence_intervall_95%(1.96STD)  unit=Kcal/mol\n',
-            f'# Mean log likelyhood = {self.mean_log_likelyhood}'
             f'{self._free_energy_value:.18e} {STD:.18e} {1.96*STD:.18e}\n'
         ]
         _write.write_file(lines, f'{str(self)}_free_energy.dat')
@@ -1030,8 +1030,8 @@ class GaussianMixturesPostProcessingAlchemicalLeg(
         # print the values of delta G and the confidence intervall (95%)
         lines = [
             f'# {str(self)}\n',
+            #f'# Mean log likelyhood = {self.mean_log_likelyhood}\n', # TODO solve nan problem
             '# Delta_G  STD  confidence_intervall_95%(1.96STD)  unit=Kcal/mol\n',
-            f'# Mean log likelyhood = {self.mean_log_likelyhood}'
             f'{self._free_energy_value:.18e} {STD:.18e} {1.96*STD:.18e}\n'
         ]
         _write.write_file(lines, f'{str(self)}_free_energy.dat')

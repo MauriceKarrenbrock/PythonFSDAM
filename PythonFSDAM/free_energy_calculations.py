@@ -7,8 +7,8 @@
 #############################################################
 """Functions and classes to do free energy calculations
 """
-
 import math
+import sys
 
 import numpy as np
 from scipy.stats import norm
@@ -135,6 +135,46 @@ def weighted_jarzynski_free_energy(works,
     return free_energy
 
 
+def jarzynski_exponential_average(works,
+                                  temperature=298.15,
+                                  boltzmann_kappa=0.001985875):
+    """Calculates the Jarzynski exponential bias (not the free energy)
+
+    Parameters
+    --------------
+    works : numpy.array
+        1-D numpy array containing the values of the
+        non equilibrium works
+        if you don't modify `boltzmann_kappa`
+        they should be Kcal (1 Kcal = 1/4.148 KJ)
+    temperature : float, optional
+        the temperature in Kelvin at which the non equilibrium simulation
+        has been done, default 298.15 K
+    boltzmann_kappa : float
+        the Boltzmann constant, the dafault is 0.001985875 kcal/(mol⋅K)
+        and if you keep it the `works` shall be in Kcal
+
+    Returns
+    --------
+    float
+        The exponential bias (it is a pure number)
+    """
+    # To avoid overflow it is done as
+    # (1/N * exp(beta * Wmin)) SUM exp(-beta(Wi - Wmin))
+
+    w_min = np.amin(works)
+
+    beta = 1 / (boltzmann_kappa * temperature)
+
+    exp_avg = works - w_min
+    exp_avg *= -beta
+    exp_avg = np.exp(exp_avg)
+    exp_avg = np.mean(exp_avg)
+    exp_avg *= math.exp(beta * w_min)
+
+    return exp_avg
+
+
 def jarzynski_bias_estimation(work_std,
                               n_work_values,
                               temperature=298.15,
@@ -194,7 +234,7 @@ def jarzynski_bias_estimation(work_std,
                                         scale=work_std,
                                         size=n_work_values)
 
-        exp_averages[i] = jarzynski_free_energy(
+        exp_averages[i] = jarzynski_exponential_average(
             random_normal_points,
             temperature=temperature,
             boltzmann_kappa=boltzmann_kappa)
@@ -275,7 +315,7 @@ def vDSSB_jarzynski_error_propagation(works_1,
                                       *,
                                       temperature=298.15,
                                       boltzmann_kappa=0.001985875,
-                                      num_iterations=10000):
+                                      num_iterations=None):
     """get STD of the Jarzynki free energy obtained by convolution of bound and unbound work vDSSB
 
     starting from the bound and unbound work values calculates the STD of the Jarzynski
@@ -294,7 +334,7 @@ def vDSSB_jarzynski_error_propagation(works_1,
     boltzmann_kappa : float
         the Boltzmann constant, the dafault is 0.001985875 kcal/(mol⋅K)
         and if you keep it the `works` shall be in Kcal
-    num_iterations : ins, optional, default=10000
+    num_iterations : ins, optional, default=sys.maxsize/10
         the number of bootstrapping iterations (time and memory consuming)
 
     Returns
@@ -309,6 +349,8 @@ def vDSSB_jarzynski_error_propagation(works_1,
     `PythonFSDAM.combine_works.combine_non_correlated_works` and uses the
     `PythonFSDAM.bootstrapping.mix_and_bootstrap` function to do the bootstrapping
     """
+    if num_iterations is None:
+        num_iterations = sys.maxsize // 10
 
     helper_obj = _vDSSBJarzynskiErrorPropagationHelperClass(
         temperature=temperature, boltzmann_kappa=boltzmann_kappa)
