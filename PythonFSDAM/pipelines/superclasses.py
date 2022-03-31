@@ -831,11 +831,11 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
         #get free energy
         self._free_energy_value += free_energy
 
+        self._hook(bound_work_values, unbound_work_values)
+
         #make a backup of the combined work values
         combined_work_values = combine_works.combine_non_correlated_works(
             bound_work_values, unbound_work_values)
-
-        self._hook(bound_work_values, unbound_work_values)
 
         del bound_work_values
         del unbound_work_values
