@@ -228,19 +228,27 @@ def jarzynski_bias_estimation(work_std,
 
     exp_averages = np.empty(n_generated_distributions)
 
+    beta = 1 / (boltzmann_kappa * temperature)
+
     for i in range(n_generated_distributions):
         # Mean=0 STD=work_std
         random_normal_points = norm.rvs(loc=0,
                                         scale=work_std,
                                         size=n_work_values)
 
-        exp_averages[i] = jarzynski_exponential_average(
-            random_normal_points,
-            temperature=temperature,
-            boltzmann_kappa=boltzmann_kappa)
+        # This is Jarzynski exponential average
+        # I have put it in line to try to use less memory
+        # To avoid un-needed copies
+        # Because I am using too much memory otherwise
+        w_min = np.amin(random_normal_points)
 
-        # Free memory in case of very big sizes
-        random_normal_points = None
+        np.subtract(random_normal_points, w_min, out=random_normal_points)
+        np.multiply(random_normal_points, -beta, out=random_normal_points)
+        np.exp(random_normal_points, out=random_normal_points)
+        random_normal_points = np.mean(random_normal_points)
+        random_normal_points *= math.exp(beta * w_min)
+
+        exp_averages[i] = random_normal_points
 
     variance = work_std * work_std
 
