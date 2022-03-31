@@ -179,7 +179,7 @@ def jarzynski_bias_estimation(work_std,
                               n_work_values,
                               temperature=298.15,
                               boltzmann_kappa=0.001985875,
-                              n_generated_distributions=1000):
+                              n_generated_distributions=100):
     """Estimates the bias of the Jarzynski free energy value
 
     If the `work_std` is in Kcal and you keep the default `boltzmann_kappa`
