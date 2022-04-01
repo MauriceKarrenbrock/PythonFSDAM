@@ -179,7 +179,7 @@ def jarzynski_bias_estimation(work_std,
                               n_work_values,
                               temperature=298.15,
                               boltzmann_kappa=0.001985875,
-                              n_generated_distributions=100):
+                              n_generated_distributions=1000):
     """Estimates the bias of the Jarzynski free energy value
 
     If the `work_std` is in Kcal and you keep the default `boltzmann_kappa`
@@ -228,27 +228,19 @@ def jarzynski_bias_estimation(work_std,
 
     exp_averages = np.empty(n_generated_distributions)
 
-    beta = 1 / (boltzmann_kappa * temperature)
-
     for i in range(n_generated_distributions):
         # Mean=0 STD=work_std
         random_normal_points = norm.rvs(loc=0,
                                         scale=work_std,
                                         size=n_work_values)
 
-        # This is Jarzynski exponential average
-        # I have put it in line to try to use less memory
-        # To avoid un-needed copies
-        # Because I am using too much memory otherwise
-        w_min = np.amin(random_normal_points)
+        exp_averages[i] = jarzynski_exponential_average(
+            random_normal_points,
+            temperature=temperature,
+            boltzmann_kappa=boltzmann_kappa)
 
-        np.subtract(random_normal_points, w_min, out=random_normal_points)
-        np.multiply(random_normal_points, -beta, out=random_normal_points)
-        np.exp(random_normal_points, out=random_normal_points)
-        random_normal_points = np.mean(random_normal_points)
-        random_normal_points *= math.exp(beta * w_min)
-
-        exp_averages[i] = random_normal_points
+        # Keep memory clean
+        del random_normal_points
 
     variance = work_std * work_std
 
@@ -323,7 +315,7 @@ def vDSSB_jarzynski_error_propagation(works_1,
                                       *,
                                       temperature=298.15,
                                       boltzmann_kappa=0.001985875,
-                                      num_iterations=None):
+                                      num_iterations=10000):
     """get STD of the Jarzynki free energy obtained by convolution of bound and unbound work vDSSB
 
     starting from the bound and unbound work values calculates the STD of the Jarzynski
@@ -342,7 +334,7 @@ def vDSSB_jarzynski_error_propagation(works_1,
     boltzmann_kappa : float
         the Boltzmann constant, the dafault is 0.001985875 kcal/(mol⋅K)
         and if you keep it the `works` shall be in Kcal
-    num_iterations : ins, optional, default=sys.maxsize/10
+    num_iterations : ins, optional, default=1000
         the number of bootstrapping iterations (time and memory consuming)
 
     Returns
@@ -357,8 +349,6 @@ def vDSSB_jarzynski_error_propagation(works_1,
     `PythonFSDAM.combine_works.combine_non_correlated_works` and uses the
     `PythonFSDAM.bootstrapping.mix_and_bootstrap` function to do the bootstrapping
     """
-    if num_iterations is None:
-        num_iterations = sys.maxsize // 10
 
     helper_obj = _vDSSBJarzynskiErrorPropagationHelperClass(
         temperature=temperature, boltzmann_kappa=boltzmann_kappa)
@@ -625,7 +615,7 @@ def VDSSB_gaussian_mixtures_error_propagation(works_1,
                                               num_iterations=50,
                                               n_gaussians=3,
                                               tol=1.E-6,
-                                              max_iterations=20000):
+                                              max_iterations=None):
     """get STD of gaussian mixture free energy obtained by convolution of bound & unbound work
 
     uses vDSSB approach
@@ -651,7 +641,7 @@ def VDSSB_gaussian_mixtures_error_propagation(works_1,
         check `gaussian_mixtures_free_energy`
     tol
         check `gaussian_mixtures_free_energy`
-    max_iterations
+    max_iterations, default=sys.maxsize // 10
         check `gaussian_mixtures_free_energy`
 
     Returns
@@ -667,6 +657,9 @@ def VDSSB_gaussian_mixtures_error_propagation(works_1,
     `PythonFSDAM.combine_works.combine_non_correlated_works` and uses the
     `PythonFSDAM.bootstrapping.mix_and_bootstrap` function to do the bootstrapping
     """
+
+    if max_iterations is None:
+        max_iterations = sys.maxsize // 10
 
     helper_obj = _vDSSBGaussianMixturesErrorPropagationHelperClass(
         temperature=temperature,
