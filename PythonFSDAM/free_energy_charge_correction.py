@@ -38,13 +38,58 @@ from scipy.spatial import ConvexHull  # pylint: disable=no-name-in-module
 from simtk import unit
 
 
-def correction_homogeneus_host_guest_system(
+def homogeneus_charge_correction_alchemical_leg(starting_charge,
+                                                final_charge,
+                                                volume,
+                                                ewald_alpha=0.37):
+    """Homogeneus charge correction for one alchemical leg
+
+    Parameters
+    ----------------
+    starting_charge : float
+        the charge of the system at the beginning of the process
+    final_charge : float
+        the charge of the system at the end of the process
+    volume : float
+        the volume of the simulation box
+    ewald_alpha : float, default=0.37(1/Angstrom)
+        the value of the ewald alpha in your MD run. units must be coherent with the volumes
+        given. default=0.37(1/Angstrom)
+
+    Returns
+    ----------
+    float
+        the energy correction, if `ewald_alpha` and the volumes are in angstrom and
+        the charges in atomic units the output will be in Hartree (atomic unit of energy)
+        1 hartree = 627.5 Kcal/mol
+
+    Notes
+    --------------
+    This correction must be added to the dissociacion free energy or removed from
+    the binding free energy
+
+    In gromacs the homogeneus correction is done under the hood by gromacs itself
+    see the function ewald_charge_correction in the source file
+    src/gromacs/ewald/ewald.cpp of the gromacs MD program
+
+    The result will be
+    math:
+        \Delta G_{correction} = - \frac{\pi}{2 \alpha ^2} {\frac{Q_{F}^{2} - (Q_{S})^2}{VOL}}}
+    """
+
+    correction = (final_charge**2 - starting_charge**2) / volume
+    correction *= -(math.pi / (2 * ewald_alpha * ewald_alpha))
+
+    return correction
+
+
+def homogeneus_charge_correction_vDSSB(
         host_charge,
         guest_charge,
         host_guest_box_volume,
         only_guest_box_volume,
         ewald_alpha=0.37):  # pylint : disable=line-too-long
-    r"""Calculate the free energy correction of an homogeneus host guest system
+    r"""Calculate the free energy correction of an homogeneus host guest system for vDSSB
 
     With homogeneus I mean that the charged ligand is very near to the surface
     of the protein. In fact if the ligand is burried in the ligand you will also
@@ -53,13 +98,18 @@ def correction_homogeneus_host_guest_system(
     This correction must be added to the dissociacion free energy or removed from
     the binding free energy
 
+    It is for the virtual double system single box vDSSB method aka the ligand gets annihilated
+    from the protein and created in a box of solvent.
+    If you need something else use the lower level function:
+    `homogeneus_charge_correction_alchemical_leg`
+
     Parameters
     -----------------
     host_charge : float or iterable(float)
-        the total charge of the host (protein) or the charge of all
+        the total charge of the host (protein and solvent) or the charge of all
         its atoms (will be summed)
     guest_charge : float or iterable(float)
-        the total charge of the host (protein) or the charge of all
+        the total charge of the ligand or the charge of all
         its atoms (will be summed)
     host_guest_box_volume : float
         the volume of the MD box of the host guest alchemical transformation
@@ -69,7 +119,7 @@ def correction_homogeneus_host_guest_system(
         it must be in units that are coherent with `ewald_alpha` (default Angstrom^3)
     ewald_alpha : float, default=0.37(1/Angstrom)
         the value of the ewald alpha in your MD run. units must be coherent with the volumes
-        given. default=0.37(1/Angstrom) a common default for gromacs
+        given. default=0.37(1/Angstrom)
 
     Returns
     ----------
@@ -82,28 +132,33 @@ def correction_homogeneus_host_guest_system(
     ----------
     The result will be
     math:
-        \Delta G_{correction} = - \frac{\pi}{2 \alpha ^2} {\frac{Q_{H}^{2} - (Q_H + Q_G)^2}{V_{BOX}^(b)} - \frac{Q^{2}_{G}}{V_{BOX}^{(u)}}
+        \Delta G_{correction} = - \frac{\pi}{2 \alpha ^2} {\frac{Q_{H}^{2} - (Q_H + Q_G)^2}{V_{BOX}^(b)} + \frac{Q^{2}_{G}}{V_{BOX}^{(u)}}
+
+    In gromacs the homogeneus correction is done under the hood by gromacs itself
+    see the function ewald_charge_correction in the source file
+    src/gromacs/ewald/ewald.cpp of the gromacs MD program
 
     References
     ------------
-    https://link.springer.com/article/10.1007/s10822-018-0151-9
-    Procacci, P., Guarrasi, M. & Guarnieri, G.
-    SAMPL6 host–guest blind predictions using a non equilibrium alchemical approach.
-    J Comput Aided Mol Des 32, 965–982 (2018).
-    https://doi.org/10.1007/s10822-018-0151-9
+    Piero Procacci and Guido Guarnieri,
+    "SAMPL9 blind predictions using nonequilibrium alchemical approaches",
+    J. Chem. Phys. 156, 164104 (2022)
+    https://doi.org/10.1063/5.0086640
     """ # pylint : disable=line-too-long
 
-    if hasattr(host_charge, '__iter__'):
-        host_charge = sum(host_charge)
-    if hasattr(guest_charge, '__iter__'):
-        guest_charge = sum(guest_charge)
+    bound = homogeneus_charge_correction_alchemical_leg(
+        starting_charge=(host_charge + guest_charge),
+        final_charge=host_charge,
+        volume=host_guest_box_volume,
+        ewald_alpha=ewald_alpha)
 
-    correction = (host_charge**2 -
-                  (host_charge - guest_charge)**2) / (host_guest_box_volume)
-    correction -= guest_charge**2 / only_guest_box_volume
-    correction *= -(math.pi / (2 * ewald_alpha * ewald_alpha))
+    unbound = homogeneus_charge_correction_alchemical_leg(
+        starting_charge=0.,
+        final_charge=guest_charge,
+        volume=only_guest_box_volume,
+        ewald_alpha=ewald_alpha)
 
-    return correction
+    return bound + unbound
 
 
 def get_charges_with_parmed(*args, **kwargs):
