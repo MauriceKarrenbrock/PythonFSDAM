@@ -13,6 +13,9 @@ import math
 import numpy as np
 import scipy.optimize as sp_opt
 
+import PythonFSDAM.bootstrapping as boot
+import PythonFSDAM.combine_works as combine
+
 
 def bar_free_energy(works_1,
                     works_2,
@@ -99,3 +102,137 @@ def bar_free_energy(works_1,
     free_energy = free_energy[0]
 
     return free_energy
+
+
+# by using this class I can choose the temp and K inside the bootstrapping function
+# had to put it outside the function to allow the use of multiprocessing
+class _vDSSBBarErrorPropagationHelperClass(object):
+    """helper class
+    """
+
+    def __init__(self, temperature, boltzmann_kappa):
+
+        self.temperature = temperature
+        self.boltzmann_kappa = boltzmann_kappa
+
+    def calculate_bar(self, works_1, works_2):
+        """helper method
+        """
+
+        return bar_free_energy(works_1,
+                               works_2,
+                               temperature=self.temperature,
+                               boltzmann_kappa=self.boltzmann_kappa)
+
+
+def vDSSB_bar_error_propagation(bound_works_1,
+                                unbound_works_1,
+                                bound_works_2,
+                                unbound_works_2,
+                                *,
+                                temperature=298.15,
+                                boltzmann_kappa=0.001985875,
+                                num_iterations=10000):
+    """get STD of the BAR free energy obtained by convolution of bound and unbound work vDSSB
+
+    starting from the bound and unbound work values calculates the STD of the bar
+    free energy estimate (if you use the vDSSB method)
+    it uses bootstrapping, can be very time and memory consuming
+
+    Parameters
+    -----------
+    bound_works_1 : numpy.array
+        the first numpy array of the work values
+        To avoid float overflow the sum of `works_1` should be negative and
+        the sum of `works_2` positive
+    unbound_works_1 : numpy.array
+        the first numpy array of the work values
+        To avoid float overflow the sum of `works_1` should be negative and
+        the sum of `works_2` positive
+    bound_works_2 : numpy.array
+        the second numpy array of the work values
+        To avoid float overflow the sum of `works_1` should be negative and
+        the sum of `works_2` positive
+    unbound_works_2 : numpy.array
+        the first numpy array of the work values
+        To avoid float overflow the sum of `works_1` should be negative and
+        the sum of `works_2` positive
+    temperature : float, optional
+        the temperature in Kelvin at which the non equilibrium simulation
+        has been done, default 298.15 K
+    boltzmann_kappa : float
+        the Boltzmann constant, the dafault is 0.001985875 kcal/(mol⋅K)
+        and if you keep it the `works` shall be in Kcal
+    num_iterations : ins, optional, default=1000
+        the number of bootstrapping iterations (time and memory consuming)
+
+    Returns
+    ----------
+    STD, mean : float, float
+        the STD of the BAR estimate and it's bootstrapped mean value
+
+    Notes
+    -----------
+    it uses the `bar_free_energy` present in this module
+    """
+
+    helper_obj = _vDSSBBarErrorPropagationHelperClass(
+        temperature=temperature, boltzmann_kappa=boltzmann_kappa)
+
+    out_mean, out_std = boot.mix_and_bootstrap_multiple_couples_of_values(
+        ((bound_works_1, unbound_works_1), (bound_works_2, unbound_works_2)),
+        mixing_function=combine.combine_non_correlated_works,
+        stat_function=helper_obj.calculate_bar,
+        num_iterations=num_iterations)
+
+    return out_std, out_mean
+
+
+def plain_bar_error_propagation(works_1,
+                                works_2,
+                                *,
+                                temperature=298.15,
+                                boltzmann_kappa=0.001985875,
+                                num_iterations=10000):
+    """bar STD via bootstrap
+
+    it doesn't use the vDSSB aproach, but only the normal
+    one, for the rest it is 100% equal to `vDSSB_bar_error_propagation`
+
+    Parameters
+    -------------
+    works_1 : numpy.array
+        the work values
+        To avoid float overflow `works_1` should be negative and
+        `works_2` positive
+    works_2 : numpy.array
+        the work values
+        To avoid float overflow `works_1` should be negative and
+        `works_2` positive
+    temperature : float, optional
+        the temperature in Kelvin at which the non equilibrium simulation
+        has been done, default 298.15 K
+    boltzmann_kappa : float
+        the Boltzmann constant, the dafault is 0.001985875 kcal/(mol⋅K)
+        and if you keep it the `works` shall be in Kcal
+    num_iterations : ins, optional, default=10000
+        the number of bootstrapping iterations (time and memory consuming)
+
+    Returns
+    ----------
+    STD, mean : float, float
+        the STD of the BAR estimate and it's bootstrapped mean value
+    """
+
+    helper_obj = _vDSSBBarErrorPropagationHelperClass(
+        temperature=temperature, boltzmann_kappa=boltzmann_kappa)
+
+    tot_works = works_1, works_2
+
+    out_mean, out_std = boot.bootstrap_std_of_function_results(
+        tot_works,
+        function=helper_obj.calculate_bar,
+        num_iterations=num_iterations,
+        number_of_sets_of_values=len(tot_works))
+
+    return out_std, out_mean

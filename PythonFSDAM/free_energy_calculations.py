@@ -385,6 +385,11 @@ def plain_jarzynski_error_propagation(works,
         and if you keep it the `works` shall be in Kcal
     num_iterations : ins, optional, default=10000
         the number of bootstrapping iterations (time and memory consuming)
+
+    Returns
+    ----------
+    STD, mean : float, float
+        the STD of the Jarzynski estimate and it's bootstrapped mean value
     """
 
     helper_obj = _vDSSBJarzynskiErrorPropagationHelperClass(
