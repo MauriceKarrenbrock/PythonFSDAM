@@ -180,7 +180,7 @@ class Testmix_and_bootstrap():
         m_std.assert_called_once()
 
 
-class Test_mix_and_bootstrap_helper_function():
+class Test_mix_and_bootstrap_multiple_couples_of_values_helper_function():
 
     def test_works(self, mocker):
 
@@ -196,9 +196,8 @@ class Test_mix_and_bootstrap_helper_function():
         m_random_factory = mocker.patch('numpy.random.default_rng',
                                         return_value=m_random_generator)
 
-        output = boot._mix_and_bootstrap_helper_function(
-            np.array([1, 2]),
-            np.array([3, 4]),
+        output = boot._mix_and_bootstrap_multiple_couples_of_values_helper_function(
+            [[np.array([1, 2]), np.array([3, 4])]],
             mixing_function=m_mixing,
             stat_function=m_stat)
 
@@ -224,8 +223,9 @@ class Testbootstrap_std_of_function_results():
 
     def test_works(self, mocker):
 
-        m_mix = mocker.patch('PythonFSDAM.bootstrapping.mix_and_bootstrap',
-                             return_value=(1., 2.))
+        m_mix = mocker.patch(
+            'PythonFSDAM.bootstrapping.mix_and_bootstrap_multiple_couples_of_values',
+            return_value=(1., 2.))
 
         output = boot.bootstrap_std_of_function_results(
             np.array([1., 2., 3.]),
