@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# pylint: disable=too-many-statements
+# pylint: disable=too-many-lines
 #############################################################
 # Copyright (c) 2020-2021 Maurice Karrenbrock               #
 #                                                           #
@@ -20,8 +22,6 @@ import PythonFSDAM.free_energy_calculations as free_energy_calculations
 import PythonFSDAM.integrate_works as integrate_works
 import PythonFSDAM.parse.parse as parse
 import PythonFSDAM.purge_outliers as purge_outliers
-
-# pylint: disable=too-many-statements
 
 ################################################
 # MixIn classes
@@ -719,6 +719,14 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
         the md program that created the output to post-process
         in some cases you can use a superclass directly by setting the right
         `md_program` in other cases you will need to use some subclass
+    bound_creation : bool, default=False
+        True if the ligand was generate in the protein-ligand system, false if it was annihilated,
+        must be different from `unbound_creation` otherwise the obtained convolution
+        will be meaningless
+    unbound_creation : bool, default=True
+        True if the ligand was generate in a box of water, false if it was annihilated,
+        must be different from `unbound_creation` otherwise the obtained convolution
+        will be meaningless
     """
 
     def __init__(self,
@@ -728,7 +736,9 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
                  vol_correction_distances_bound_state=None,
                  vol_correction_distances_unbound_state=None,
                  temperature=298.15,
-                 md_program='gromacs'):
+                 md_program='gromacs',
+                 bound_creation=False,
+                 unbound_creation=True):
 
         self.bound_state_dhdl = bound_state_dhdl
 
@@ -742,11 +752,34 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
 
         self.md_program = md_program
 
+        self.bound_creation = bound_creation
+
+        self.unbound_creation = unbound_creation
+
         self._free_energy_value = 0.
+
+        # Checking if everything is ok
+        self._check_bound_unbound_creation()
 
     def __str__(self):
 
         return 'vDSSB_not_defined_pipeline'
+
+    def _check_bound_unbound_creation(self):
+        """Private
+        """
+
+        if not (isinstance(self.bound_creation, bool)
+                and isinstance(self.unbound_creation, bool)):
+            raise TypeError(
+                'bound_creation and unbound_creation must be boolean, '
+                f'not {type(self.bound_creation)} and {type(self.unbound_creation)}'
+            )
+
+        if self.bound_creation == self.unbound_creation:
+            raise ValueError(
+                'bound_creation and unbound_creation must be different, '
+                'otherwise the obtained convolution will be meaningless')
 
     def _write_free_energy_file(self, STD):
         """Private
@@ -781,14 +814,14 @@ class VDSSBPostProcessingPipeline(Pipeline, FreeEnergyMixInSuperclass,
         bound_work_values = self.get_purged_work_values(
             self.bound_state_dhdl,
             md_program=self.md_program,
-            creation=False,
+            creation=self.bound_creation,
             z_score=z_score)
 
         #numpy array
         unbound_work_values = self.get_purged_work_values(
             self.unbound_state_dhdl,
             md_program=self.md_program,
-            creation=True,
+            creation=self.unbound_creation,
             z_score=z_score)
 
         # print a backup to file
