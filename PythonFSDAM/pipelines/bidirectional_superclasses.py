@@ -319,9 +319,25 @@ class PostProcessingSuperclass(_super.Pipeline, FreeEnergyMixInSuperclass,
 
         self._free_energy_value = 0.
 
+        self._check_creation()
+
     def __str__(self):
 
         return 'not_defined_pipeline'
+
+    def _check_creation(self):
+        """Private
+        """
+        # 1
+        if not (isinstance(self.creation_1, bool)
+                and isinstance(self.creation_2, bool)):
+            raise TypeError(
+                'creation_1 and creation_2 must be boolean, '
+                f'not {type(self.creation_1)} and {type(self.creation_2)}')
+
+        if self.creation_1 == self.creation_2:
+            raise ValueError('creation_1 and creation_2 must be different, '
+                             'you are not describing a bidirectional process')
 
     def _write_free_energy_file(self, STD):
         """Private
