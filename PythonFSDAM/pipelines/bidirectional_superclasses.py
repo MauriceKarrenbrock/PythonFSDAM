@@ -560,7 +560,7 @@ class VDSSBPostProcessingPipeline(_super.Pipeline, FreeEnergyMixInSuperclass,
                 'otherwise the obtained convolution will be meaningless')
 
         # Check if the two processes are actually different
-        if self.bound_creation_1 == self.bound_creation_1:
+        if self.bound_creation_1 == self.bound_creation_2:
             raise ValueError(
                 '(un)bound_creation_1 and (un)bound_creation_2 must be different, '
                 'you are not describing a bidirectional process')
