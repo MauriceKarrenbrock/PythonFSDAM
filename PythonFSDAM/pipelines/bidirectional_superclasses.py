@@ -172,7 +172,7 @@ class BarFreeEnergyMixIn(FreeEnergyMixInSuperclass):
     def vdssb_calculate_free_energy(self, bound_works_1, unbound_works_1,
                                     bound_works_2, unbound_works_2,
                                     temperature):
-        """calculate the Jarzynski free energy vDSSB
+        """calculate the BAR free energy vDSSB
 
         Parameters
         ------------
@@ -223,8 +223,6 @@ class BarFreeEnergyMixIn(FreeEnergyMixInSuperclass):
                                            bound_works_2, unbound_works_2,
                                            temperature):
         """calculates STD of the free energy with bootstrapping vDSSB
-
-        it is a wrapper of `PythonFSDAM.free_energy_calculations.vDSSB_jarzynski_error_propagation`
         """
 
         STD, mean = _free.vDSSB_bar_error_propagation(bound_works_1,
@@ -232,6 +230,109 @@ class BarFreeEnergyMixIn(FreeEnergyMixInSuperclass):
                                                       bound_works_2,
                                                       unbound_works_2,
                                                       temperature=temperature)
+
+        return STD, mean
+
+
+class CrooksGaussianCrossingFreeEnergyMixIn(FreeEnergyMixInSuperclass):
+    """MixIn that implements the Crooks gaussian crossing theorem
+
+    contains the methods needed both for the standard and vDSSB
+    approach
+
+    the vDSSB methods will contain vdssb in the method name
+
+    Notes
+    ------------
+    implements the abstract class `FreeEnergyMixInSuperclass`
+    """
+
+    @staticmethod
+    def calculate_free_energy(works_1, works_2, temperature):
+        """calculate the bidirectional free energy
+
+        Parameters
+        ------------
+        works_1 : numpy.array
+            the work values in Kcal/mol
+        works_2 : numpy.array
+            the work values in Kcal/mol
+        temperature : float
+            is there only for interface homogeneity
+
+        Returns
+        --------------
+        free_energy : float
+            Kcal/mol
+        """
+
+        temperature = None  # useless
+
+        return _free.crooks_gaussian_crossing_free_energy(works_1, works_2)
+
+    def vdssb_calculate_free_energy(self, bound_works_1, unbound_works_1,
+                                    bound_works_2, unbound_works_2,
+                                    temperature):
+        """calculate the Crooks gaussian crossing free energy vDSSB
+
+        Parameters
+        ------------
+        bound_works_1 : numpy.array
+            numpy array of the work values
+            in Kcal/mol
+        unbound_works_1 : numpy.array
+            numpy array of the work values
+            in Kcal/mol
+        bound_works_2 : numpy.array
+            numpy array of the work values
+            in Kcal/mol
+        unbound_works_2 : numpy.array
+            numpy array of the work values
+            in Kcal/mol
+        temperature : float
+            is there only for interface homogeneity
+
+        Returns
+        --------------
+        free_energy : float
+            Kcal/mol
+        """
+
+        temperature = None  # useless
+
+        works_1 = combine_works.combine_non_correlated_works(
+            bound_works_1, unbound_works_1)
+
+        works_2 = combine_works.combine_non_correlated_works(
+            bound_works_2, unbound_works_2)
+
+        free_energy = self.calculate_free_energy(works_1, works_2, temperature)
+
+        return free_energy
+
+    @staticmethod
+    def calculate_standard_deviation(works_1, works_2, temperature):
+        """calculates STD of the free energy with bootstrapping
+        """
+
+        temperature = None  # useless
+
+        STD, mean = _free.plain_crooks_gaussian_crossing_error_propagation(
+            works_1, works_2)
+
+        return STD, mean
+
+    @staticmethod
+    def vdssb_calculate_standard_deviation(bound_works_1, unbound_works_1,
+                                           bound_works_2, unbound_works_2,
+                                           temperature):
+        """calculates STD of the free energy with bootstrapping vDSSB
+        """
+
+        temperature = None  # useless
+
+        STD, mean = _free.vDSSB_crooks_gaussian_crossing_error_propagation(
+            bound_works_1, unbound_works_1, bound_works_2, unbound_works_2)
 
         return STD, mean
 
@@ -768,3 +869,37 @@ class BarPostProcessingAlchemicalLeg(PostProcessingSuperclass,
     def __str__(self):
 
         return 'standard_bidirectional_bar_pipeline'
+
+
+class CrooksGaussianCrossingVDSSBPostProcessingPipeline(
+        VDSSBPostProcessingPipeline, CrooksGaussianCrossingFreeEnergyMixIn):
+    """calculates free energy with  CrooksGaussianCrossing and the vDSSB method
+
+    subclass of `VDSSBPostProcessingPipeline` and `CrooksGaussianCrossingFreeEnergyMixIn` that
+
+    The distances for this class must be in Angstrom and the energies will always be in
+    Kcal/mol
+
+    This class elaborates bound and unbound state toghether, that is very different from
+    the not vDSSB one
+    """
+
+    def __str__(self):
+
+        return 'vDSSB_bidirectional_crooks_gaussian_crossing_pipeline'
+
+
+class CrooksGaussianCrossingPostProcessingAlchemicalLeg(
+        PostProcessingSuperclass, CrooksGaussianCrossingFreeEnergyMixIn):
+    """post processing class for plain CrooksGaussianCrossing (no vDSSB)
+
+    this class post processes only a single alchemical leg (bound or unbound)
+    note that this behaviour is very different from his vDSSB counterpart that
+    post processes everything together
+
+    see documentation for `PostProcessingSuperclass` and `CrooksGaussianCrossingFreeEnergyMixIn`
+    """
+
+    def __str__(self):
+
+        return 'standard_bidirectional_crooks_gaussian_crossing_pipeline'
