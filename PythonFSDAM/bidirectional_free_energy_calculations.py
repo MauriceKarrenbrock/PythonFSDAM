@@ -35,15 +35,11 @@ def bar_free_energy(works_1,
         non equilibrium works
         if you don't modify `boltzmann_kappa`
         they should be Kcal (1 Kcal = 1/4.148 KJ)
-        To avoid float overflow `works_1` should be negative and
-        `works_2` positive
     works_2 : numpy.array
         1-D numpy array containing the values of the
         non equilibrium works
         if you don't modify `boltzmann_kappa`
         they should be Kcal (1 Kcal = 1/4.148 KJ)
-        To avoid float overflow `works_1` should be negative and
-        `works_2` positive
     temperature : float, optional
         the temperature in Kelvin at which the non equilibrium simulation
         has been done, default 298.15 K
@@ -62,7 +58,7 @@ def bar_free_energy(works_1,
     def function_to_minimize(x, works_1, works_2, beta, M):
 
         def helper(works, x, beta, M):
-            # A vectorized and memery efficient way to calculate
+            # A vectorized and memory efficient way to calculate
             # 1./(1 + EXP( beta * (work + M - x) ))
             summation = works + M
             summation -= x
@@ -84,6 +80,10 @@ def bar_free_energy(works_1,
         return (sum_1 - sum_2)**2
 
     kappa_T = temperature * boltzmann_kappa
+
+    # In this way works_* have the same sign
+    # otherwise the result would be wrong
+    works_1 = -works_1
 
     if works_1.size == works_2.size:
         M = 0.

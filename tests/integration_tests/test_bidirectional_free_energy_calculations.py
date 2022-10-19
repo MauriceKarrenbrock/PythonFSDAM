@@ -25,7 +25,7 @@ class Testbar_free_energy():
         output = free.bar_free_energy(random_normal_points_1,
                                       random_normal_points_2)
 
-        assert output == pytest.approx(1, abs=0.01)
+        assert output == pytest.approx(2, abs=0.01)
 
 
 class Test_plain_bar_error_propagation():
@@ -39,7 +39,7 @@ class Test_plain_bar_error_propagation():
                                                        random_normal_points_2,
                                                        num_iterations=500)
 
-        assert out_mean == pytest.approx(1, abs=0.01)
+        assert out_mean == pytest.approx(2, abs=0.01)
 
 
 class Testcrossing_of_2_gaussians():
