@@ -1,0 +1,8 @@
+sphinx>=4.5.0
+numpydoc
+pydata-sphinx-theme
+sphinx-design
+ipython!=8.1.0
+scipy
+matplotlib
+pandas
