@@ -1,4 +1,7 @@
-git+https://github.com/MauriceKarrenbrock/FSDAMGromacs.git #FSDAMGromacs
+git+https://github.com/MauriceKarrenbrock/FSDAMGromacs.git # FSDAMGromacs
+git+https://github.com/MauriceKarrenbrock/PythonAuxiliaryFunctions # PythonAuxiliaryFunctions
+git+https://github.com/MauriceKarrenbrock/PythonPDBStructures # PythonPDBStructures
+MDAnalysis>=1.1.1
 mdtraj
 numpy
 openmm
