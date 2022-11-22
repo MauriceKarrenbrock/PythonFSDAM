@@ -1,4 +1,7 @@
 git+https://github.com/MauriceKarrenbrock/FSDAMGromacs.git #FSDAMGromacs
+mdtraj
 numpy
+openmm
+pandas
+ParmEd
 scipy
-
