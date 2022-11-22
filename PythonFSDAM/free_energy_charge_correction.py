@@ -42,7 +42,7 @@ def homogeneus_charge_correction_alchemical_leg(starting_charge,
                                                 final_charge,
                                                 volume,
                                                 ewald_alpha=0.37):
-    """Homogeneus charge correction for one alchemical leg
+    r"""Homogeneus charge correction for one alchemical leg
 
     Parameters
     ----------------
@@ -73,7 +73,9 @@ def homogeneus_charge_correction_alchemical_leg(starting_charge,
     src/gromacs/ewald/ewald.cpp of the gromacs MD program
 
     The result will be
-    math:
+
+    .. math::
+
         \Delta G_{correction} = - \frac{\pi}{2 \alpha ^2} {\frac{Q_{F}^{2} - (Q_{S})^2}{VOL}}}
     """
 
@@ -131,7 +133,9 @@ def homogeneus_charge_correction_vDSSB(
     Notes
     ----------
     The result will be
-    math:
+
+    .. math::
+
         \Delta G_{correction} = - \frac{\pi}{2 \alpha ^2} {\frac{Q_{H}^{2} - (Q_H + Q_G)^2}{V_{BOX}^(b)} + \frac{Q^{2}_{G}}{V_{BOX}^{(u)}}
 
     In gromacs the homogeneus correction is done under the hood by gromacs itself
@@ -166,6 +170,7 @@ def get_charges_with_parmed(*args, **kwargs):
 
     This function uses parmed.load_file to parse wathever parameter
     file / force field file supported and gets the charges
+
     Parameters
     ------------
     *args
@@ -235,7 +240,7 @@ def globular_protein_correction(pdb_file,
     """correction for charged ligands in globular proteins
 
     this correction must be added to
-    ```correction_homogeneus_host_guest_system```
+    `correction_homogeneus_host_guest_system`
     and treats the protein as a perfect sphere
     therefore the less globular the protein is the
     less correct the result is

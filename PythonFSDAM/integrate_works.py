@@ -125,8 +125,8 @@ def integrate_work_profiles(lambda_work):
     lambda_work : numpy.array
         a 2-D array with 1 st line is lambda and the 2nd dH/dL
         [
-            [lambda, lambda, lambda],
-            [dH/dL, dH/dL, dH/dL]
+        [lambda, lambda, lambda],
+        [dH/dL, dH/dL, dH/dL]
         ]
 
     Returns
@@ -248,8 +248,8 @@ def get_work_profile_vs_lambda(lambda_work):
     lambda_work : numpy.array
         a 2-D array with 1 st line is lambda and the 2nd dH/dL
         [
-            [lambda, lambda, lambda],
-            [dH/dL, dH/dL, dH/dL]
+        [lambda, lambda, lambda],
+        [dH/dL, dH/dL, dH/dL]
         ]
 
     Returns

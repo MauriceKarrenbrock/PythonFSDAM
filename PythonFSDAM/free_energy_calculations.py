@@ -22,7 +22,7 @@ import PythonFSDAM.exp_max_gaussmix as em
 def jarzynski_free_energy(works,
                           temperature=298.15,
                           boltzmann_kappa=0.001985875):
-    """Calculates the Jarzynski free energy
+    r"""Calculates the Jarzynski free energy
 
     starting from the non equilibrium works obtained
     from for example alchemical transformations
@@ -57,10 +57,13 @@ def jarzynski_free_energy(works,
     Notes
     -----------
     Normally the Jarzynski free energy is calculated so
-    math :: \Delta G = -kT log (\sum_i e^{-\beta W_i} /N)
+
+    .. math :: \Delta G = -kT log (\sum_i e^{-\beta W_i} /N)
 
     but to avoid overflow I calculate it:
-    math::
+
+    .. math::
+
         \Delta G = -kT log (\sum_i e^{-\beta W_i} /N)
         = -kT log [e^ {-\beta W_{min}}(\sum_i e^{-\beta (W_i - W_{min})}/N]
         =  W_{min} - kT log(\sum_i e^{-\beta (W_i-W_{min})}/N]
@@ -117,6 +120,7 @@ def weighted_jarzynski_free_energy(works,
         the weights you want to give to the work values
         they must be in the same order of the works
         and in the same number
+
     for all other parameters check `jarzynski_free_energy`
     """
 
@@ -248,7 +252,7 @@ def jarzynski_bias_estimation(work_std,
 
 
 def volume_correction(distance_values, temperature=298.15):
-    """Calculates the volume correction of the free energy
+    r"""Calculates the volume correction of the free energy
 
     Parameters
     -------------
@@ -270,8 +274,10 @@ def volume_correction(distance_values, temperature=298.15):
     Notes
     ----------
     the correction is calculated
-    math :: \Delta G_{vol} = RT ln (V_{site} / V_{0})
-    with math:: V_0 = 1661
+
+    .. math :: \Delta G_{vol} = RT ln (V_{site} / V_{0})
+
+    with :math:`V_0 = 1661`
     for more info check https://dx.doi.org/10.1021/acs.jctc.0c00634
     """
 
@@ -444,7 +450,7 @@ def gaussian_mixtures_free_energy(works,
                                   tol=1.E-6,
                                   max_iterations=None,
                                   gaussians=None):
-    """Calculates the free energy with the gaussian mixtures method
+    r"""Calculates the free energy with the gaussian mixtures method
 
     starting from the non equilibrium works obtained
     from for example alchemical transformations
@@ -507,7 +513,9 @@ def gaussian_mixtures_free_energy(works,
     ----------
     the formula is (for more info check https://dx.doi.org/10.1021/acs.jctc.0c00634
     and http://dx.doi.org/10.1063/1.4918558)
-    math :
+
+    .. math ::
+
     \Delta G = k_b T ln( \sum w_i e^( \mu - \beta \sigma^2 / 2))
     """
 
