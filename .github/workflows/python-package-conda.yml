@@ -3,6 +3,9 @@ name: Python Package using Conda
 on: [push, pull_request]
 
 jobs:
+  defaults:
+    run:
+      shell: bash -l {0}
   build-linux:
     runs-on: ubuntu-latest
     strategy:
@@ -30,6 +33,7 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
+        conda init bash
         conda activate test
         conda install -y -c conda-forge pytest pytest-mock
         pytest
