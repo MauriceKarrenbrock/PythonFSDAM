@@ -37,4 +37,5 @@ jobs:
         python -m pip install -r doc-requirements.txt
         cd docs
         make html
+        cp -a build/html/* .
         cd ..
