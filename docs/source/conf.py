@@ -45,6 +45,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx_design',
     'sphinx_mdinclude',
+    'sphinx.ext.githubpages',
 ]
 
 # If true, the current module name will be prepended to all description
