@@ -47,6 +47,12 @@ jobs:
           cd docs
           make html
           cp -a build/html/. .
+          mv _static static
+          sed -i "s/_static/static/g" *
+          mv _sphinx_design_static/ sphinx_design_static/
+          sed -i "s/_sphinx_design_static/sphinx_design_static/g" *
+          mv _apidocs/ apidocs/
+          sed -i "s/_apidocs/apidocs/g" *
           cd ..
       - name: Setup Pages
         uses: actions/configure-pages@v2
@@ -54,7 +60,7 @@ jobs:
         uses: actions/jekyll-build-pages@v1
         with:
           source: docs/
-          destination: ./_site
+          destination: docs/_site
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
 

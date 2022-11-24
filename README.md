@@ -12,7 +12,7 @@ python -m pip install git+https://github.com/MauriceKarrenbrock/PythonFSDAM.git
 
 ## Documentation
 
-Read the documentation [here]().
+Read the documentation [here](https://mauricekarrenbrock.github.io/PythonFSDAM/).
 
 ## Code
 
