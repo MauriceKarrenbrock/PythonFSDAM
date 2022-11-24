@@ -48,11 +48,11 @@ jobs:
           make html
           cp -a build/html/. .
           mv _static static
-          sed -i "s/_static/static/g" *
+          sed -i "s/_static/static/g" *.html *.inv *.js
           mv _sphinx_design_static/ sphinx_design_static/
-          sed -i "s/_sphinx_design_static/sphinx_design_static/g" *
+          sed -i "s/_sphinx_design_static/sphinx_design_static/g" *.html *.inv *.js
           mv _apidocs/ apidocs/
-          sed -i "s/_apidocs/apidocs/g" *
+          sed -i "s/_apidocs/apidocs/g" *.html *.inv *.js
           cd ..
       - name: Setup Pages
         uses: actions/configure-pages@v2
