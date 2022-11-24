@@ -53,7 +53,6 @@ jobs:
           sed -i "s/_sphinx_design_static/sphinx_design_static/g" *.html *.inv *.js
           mv _apidocs/ apidocs/
           sed -i "s/_apidocs/apidocs/g" *.html *.inv *.js
-          mkdir _site
           cd ..
       - name: Setup Pages
         uses: actions/configure-pages@v2
@@ -61,7 +60,7 @@ jobs:
         uses: actions/jekyll-build-pages@v1
         with:
           source: docs/
-          destination: docs/_site
+          destination: ./_site
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
 
