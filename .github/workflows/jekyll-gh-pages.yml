@@ -53,6 +53,7 @@ jobs:
           sed -i "s/_sphinx_design_static/sphinx_design_static/g" *.html *.inv *.js
           mv _apidocs/ apidocs/
           sed -i "s/_apidocs/apidocs/g" *.html *.inv *.js
+          mkdir _site
           cd ..
       - name: Setup Pages
         uses: actions/configure-pages@v2
