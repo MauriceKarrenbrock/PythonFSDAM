@@ -7,4 +7,5 @@ numpy
 openmm
 pandas
 ParmEd
+pymbar>=4.0.1
 scipy

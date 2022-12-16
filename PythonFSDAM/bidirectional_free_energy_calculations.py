@@ -8,11 +8,10 @@
 """Functions and classes to do bidirectional (Crooks) free energy calculations
 """
 
-import math
 import sys
 
 import numpy as np
-import scipy.optimize as sp_opt
+import pymbar.other_estimators as _pymbar_other
 
 import PythonFSDAM.bootstrapping as boot
 import PythonFSDAM.combine_works as combine
@@ -55,53 +54,28 @@ def bar_free_energy(works_1,
         `works` where in Kcal it is in Kcal/mol
     """
 
-    def function_to_minimize(x, works_1, works_2, beta, M):
+    # Values must be in units of kT
+    works_1 /= temperature * boltzmann_kappa
+    works_2 /= temperature * boltzmann_kappa
 
-        def helper(works, x, beta, M):
-            # A vectorized and memory efficient way to calculate
-            # 1./(1 + EXP( beta * (work + M - x) ))
-            summation = works + M
-            summation -= x
-            summation *= beta
-            summation = np.exp(summation)
-            summation += 1
-            summation = 1 / summation
+    # If the deafult method fails will try the self-consistent-iteration one
+    try:
+        free_energy = _pymbar_other.bar(works_1,
+                                        works_2,
+                                        maximum_iterations=10000)
 
-            # summation -> becomes a float
-            summation = np.sum(summation)
+    except Exception:  # pylint: disable=broad-except
+        free_energy = _pymbar_other.bar(works_1,
+                                        works_2,
+                                        maximum_iterations=10000,
+                                        method='self-consistent-iteration')
 
-            return summation
+    # _pymbar_other.bar returns a dict with the DG and the uncertainty
+    # I only care about the free energy
+    free_energy = free_energy['Delta_f']
 
-        sum_1 = helper(works_1, x, beta, M)
-
-        # Here beta has the sign switched!
-        sum_2 = helper(works_2, x, -beta, M)
-
-        return (sum_1 - sum_2)**2
-
-    kappa_T = temperature * boltzmann_kappa
-
-    # In this way works_* have the same sign
-    # otherwise the result would be wrong
-    works_1 = -works_1
-
-    if works_1.size == works_2.size:
-        M = 0.
-    else:
-        M = kappa_T * math.log(works_1.size / works_2.size)
-
-    # Mean of the means as first guess
-    x0 = np.mean(works_1) + np.mean(works_2)
-    x0 /= 2.
-
-    free_energy = sp_opt.fmin(function_to_minimize,
-                              x0=x0,
-                              args=(works_1, works_2, 1. / kappa_T, M),
-                              disp=False,
-                              full_output=False)
-
-    # The function returns a 1X1 array, I want a float
-    free_energy = free_energy[0]
+    # Back to the right units (default=Kcal/mol)
+    free_energy *= temperature * boltzmann_kappa
 
     return free_energy
 
