@@ -466,7 +466,7 @@ class PostProcessingSuperclass(_super.Pipeline, FreeEnergyMixInSuperclass,
             the free energy and the standard deviation
         """
 
-        z_score = 3.0
+        z_score = 100000
         work_values_1 = self.get_purged_work_values(self.dhdl_files_1,
                                                     md_program=self.md_program,
                                                     creation=self.creation_1,
@@ -695,7 +695,7 @@ class VDSSBPostProcessingPipeline(_super.Pipeline, FreeEnergyMixInSuperclass,
         #calculate and purge outliers (zscore > z_score)
         #for bound and unbound work
 
-        z_score = 3.0
+        z_score = 100000
 
         # 1
         #numpy array
