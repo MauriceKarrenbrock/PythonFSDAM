@@ -100,7 +100,7 @@ class Testintegrate_multiple_work_files():
 class Testintegrate_work_profiles():
     def test_works(self, mocker):
 
-        m_trapz = mocker.patch('numpy.trapz', return_value=1.)
+        m_trapz = mocker.patch('numpy.trapezoid', return_value=1.)
 
         input_array = np.array([[1, 2, 3], [4, 5, 6]])
 

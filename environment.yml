@@ -13,6 +13,8 @@ dependencies:
   - parmed
   - MDAnalysis>=1.1.1
   - pymbar>=4.0.1
+  - pytest
+  - pytest-mock
   - pip:
     - 'git+https://github.com/MauriceKarrenbrock/FSDAMGromacs.git'
     - 'git+https://github.com/MauriceKarrenbrock/PythonAuxiliaryFunctions'

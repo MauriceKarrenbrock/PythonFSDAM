@@ -115,7 +115,7 @@ def integrate_multiple_work_files(work_files,
 
 
 def integrate_work_profiles(lambda_work):
-    """Integrates the work profiles with numpy.trapz
+    """Integrates the work profiles with numpy.trapz/np.trapezoid
 
     it takes the results of a non equilibium simulation
     and integrates it returning an array of work values
@@ -134,8 +134,10 @@ def integrate_work_profiles(lambda_work):
     float
         the value of the integral of the work profile
     """
-
-    work_result = np.trapz(lambda_work[1], lambda_work[0])
+    try:
+        work_result = np.trapz(lambda_work[1], lambda_work[0])
+    except AttributeError:
+        work_result = np.trapezoid(lambda_work[1], x=lambda_work[0])
 
     return work_result
 

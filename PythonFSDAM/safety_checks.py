@@ -239,7 +239,7 @@ def ellipsoid_fit(X):
 
     R = translation_matrix.dot(A).dot(translation_matrix.T)
 
-    evals, evecs = np.linalg.eig(R[:3, :3] / -R[3, 3])
+    evals, evecs = np.linalg.eigh(R[:3, :3] / -R[3, 3])
     evecs = evecs.T
 
     radii = np.sqrt(1. / np.abs(evals))
